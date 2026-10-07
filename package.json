@@ -1,0 +1,41 @@
+{
+  "name": "wayfarer-game",
+  "version": "1.0.0",
+  "description": "Wayfarer: an exploration and settlement-building game",
+  "main": "main.js",
+  "author": "Wayfarer",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^37.2.6",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.wayfarer.game",
+    "productName": "Wayfarer",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "wayfarer.html",
+      "icon.ico",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico",
+      "artifactName": "Wayfarer-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Wayfarer"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.npm-cache/
+.electron-cache/
+.localappdata/
+.DS_Store
+.gh-config/
+.gitconfig-auth
