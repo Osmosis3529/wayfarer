@@ -13,3 +13,5 @@ A text-graphics exploration and settlement-building game for Windows.
 Run `npm run dist`. The NSIS installer will be created in `dist/` and offers a desktop shortcut during installation.
 
 Worlds are saved in the app's local browser storage. Use the in-game save/export options to keep backups.
+
+The world runs in real time (a day lasts 90 seconds); it pauses while a dialog or fight is open, or the window is in the background.
