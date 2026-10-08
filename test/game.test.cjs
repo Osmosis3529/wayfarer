@@ -126,12 +126,12 @@ test('overworld enemies respawn up to the cap', () => game(async page => {
 
 test('dungeons refill only after every foe is defeated', () => game(async page => {
   const r = await page.evaluate(() => {
-    const k = dungeons.find(d => !d.boss), reenter = () => { exitInstance(); state.x = k.x; state.y = k.y; enterInstance(k, 'dungeon'); };
+    const k = dungeons.find(d => !d.boss), awayFor = ms => { exitInstance(); state.clock += ms; state.x = k.x; state.y = k.y; enterInstance(k, 'dungeon'); };
     state.x = k.x; state.y = k.y; enterInstance(k, 'dungeon'); const m = map, count = () => m.flat().filter(c => c === 'g').length;
     let last = null; for (let y = 0; y < m.length; y++) for (let x = 0; x < m[0].length; x++) if (m[y][x] === 'g') { if (!last) last = [x, y]; else { m[y][x] = '.'; enemyBucket(m).delete(x + ',' + y); } }
-    state.clock += INSTANCE_RESPAWN_MS * 100; reenter(); const whileOneAlive = count();
+    awayFor(INSTANCE_RESPAWN_MS * 100); const whileOneAlive = count();
     startCombat(last[0], last[1], state.x, state.y); state.combat.hp = 1; battleAction('heavy'); const cleared = count();
-    state.clock += INSTANCE_RESPAWN_MS * 2 + 5; reenter(); const afterTwoMinutes = count();
+    awayFor(INSTANCE_RESPAWN_MS * 2 + 5); const afterTwoMinutes = count();
     return { whileOneAlive, cleared, afterTwoMinutes };
   });
   assert.deepEqual(r, { whileOneAlive: 1, cleared: 0, afterTwoMinutes: 2 });
@@ -202,4 +202,99 @@ test('berries can be eaten underground', () => game(async page => {
     return { hasButton: !!button, hp: state.hp, berries: state.inv.berries };
   });
   assert.deepEqual(r, { hasButton: true, hp: 4, berries: 1 });
+}));
+
+test('mine levels refill from when you leave, not from when you entered', () => game(async page => {
+  const r = await page.evaluate(() => {
+    const k = mines[0]; state.x = k.x; state.y = k.y; enterInstance(k, 'mine');
+    const m = map, count = () => m.flat().filter(c => c === 'g').length, cap = count();
+    let kept = false; for (let y = 0; y < m.length; y++) for (let x = 0; x < m[0].length; x++) if (m[y][x] === 'g') { if (!kept) kept = true; else { m[y][x] = '.'; enemyBucket(m).delete(x + ',' + y); } }
+    state.clock += INSTANCE_RESPAWN_MS * 30;           // spent a long time inside the level
+    const reenter = away => { exitInstance(); state.clock += away; state.x = k.x; state.y = k.y; enterInstance(k, 'mine'); };
+    reenter(0); const rightAway = count();
+    reenter(INSTANCE_RESPAWN_MS + 5); const afterOneMinute = count();
+    return { cap, rightAway, afterOneMinute };
+  });
+  assert.ok(r.cap >= 3); assert.equal(r.rightAway, 1); assert.equal(r.afterOneMinute, 2);
+}));
+
+test('common enemies are weaker than a leveled player', () => game(async page => {
+  const r = await page.evaluate(() => {
+    let wins = 0, total = 0;
+    for (const name of ['wolf', 'boar', 'bandit']) for (let i = 0; i < 60; i++) {
+      state.level = 3; state.maxHp = 6; state.hp = 6; state.inv.berries = 0; state.coin = 10; state.x = HOME.x + 12; state.y = HOME.y;
+      state.equipped = { weapon: { name: 'Bronze knife', damage: 1 }, armor: { name: 'Padded vest', health: 1 } };
+      const x = state.x + 1, y = state.y; overworld[y][x] = 'g'; enemyBucket(overworld).set(x + ',' + y, { ...enemyCatalog[name] });
+      startCombat(x, y, state.x, state.y);
+      for (let t = 0; t < 40 && state.combat; t++) battleAction(state.focus > 0 ? 'heavy' : 'attack');
+      total++; if (state.x !== HOME.x) wins++;       // a death sends you home
+    }
+    return wins / total;
+  });
+  assert.ok(r >= 0.9, 'win rate was ' + r);
+}));
+
+test('soldiers fight instead of instantly killing, and gear changes the outcome', () => game(async page => {
+  const r = await page.evaluate(() => {
+    state.inv.wood = 50; state.inv.stone = 50; build('barracks'); syncSoldiers();
+    const place = () => { const g = state.soldiers[0]; const x = g.x + 1, y = g.y; overworld[y][x] = 'g'; enemyBucket(overworld).set(x + ',' + y, { ...enemyCatalog.boar }); return [g, x, y]; };
+    const rounds = () => { const [g, x, y] = place(); let n = 0; while (overworld[y][x] === 'g' && state.soldiers.includes(g) && n < 60) { soldierFight(g, x, y); n++; g.hp = g.maxHp; } return n; };
+    const avg = () => { let t = 0; for (let i = 0; i < 20; i++) t += rounds(); return t / 20; };
+    const bare = avg();
+    state.equipped.weapon = { name: 'Iron longsword', damage: 3 }; state.equipped.armor = { name: 'Ring mail', health: 3 }; syncSoldiers();
+    const geared = avg();
+    return { bare, geared, hpGeared: state.soldiers[0].maxHp };
+  });
+  assert.ok(r.bare > 1.5, 'unarmed soldiers still one-shot: ' + r.bare);
+  assert.ok(r.geared < r.bare); assert.equal(r.hpGeared, 9);
+}));
+
+test('a fallen soldier is replaced for 2 meals, or waits until the pantry can pay', () => game(async page => {
+  const r = await page.evaluate(() => {
+    state.inv.wood = 50; state.inv.stone = 50; build('barracks'); syncSoldiers(); const n = state.soldiers.length;
+    const kill = () => { const g = state.soldiers[0]; g.hp = 1; const x = g.x + 1, y = g.y; overworld[y][x] = 'g'; enemyBucket(overworld).set(x + ',' + y, { ...enemyCatalog.troll, level: 30, maxHp: 999, curHp: 999 }); soldierFight(g, x, y); };
+    state.town.food = 5; kill(); syncSoldiers(); const paid = { food: state.town.food, soldiers: state.soldiers.length, debt: state.soldierDebt };
+    state.town.food = 1; kill(); syncSoldiers(); const broke = { soldiers: state.soldiers.length, debt: state.soldierDebt };
+    state.town.food = 6; advanceDay(); const later = { soldiers: state.soldiers.length, debt: state.soldierDebt, food: state.town.food };
+    return { n, paid, broke, later };
+  });
+  assert.equal(r.paid.food, 3); assert.equal(r.paid.soldiers, r.n); assert.equal(r.paid.debt, 0);
+  assert.equal(r.broke.soldiers, r.n - 1); assert.equal(r.broke.debt, 1);
+  assert.equal(r.later.soldiers, r.n); assert.equal(r.later.debt, 0);
+}));
+
+test('towns have regional goods and trading requires being in town', () => game(async page => {
+  const r = await page.evaluate(() => {
+    const t = settlements[0]; t.discovered = true;
+    const [cheap] = t.surplus, [dear] = t.scarce;
+    const prices = { cheapBuy: regionPrice({ ...t, bias: 0 }, cheap, 'buy') - buyPrices[cheap], dearSell: regionPrice({ ...t, bias: 0 }, dear, 'sell') - sellPrices[dear] };
+    state.x = HOME.x; state.y = HOME.y; closeDialog(); trade(t.id); const farAway = document.getElementById('overlay').style.display;
+    state.x = t.x; state.y = t.y; trade(t.id); const inTown = document.getElementById('overlay').style.display;
+    renderSettlements();
+    return { prices, farAway, inTown, listHasButton: !!document.querySelector('#settlement-list button'), distinct: settlements.every(s => s.surplus.length === 2 && s.scarce.length === 2 && !s.surplus.some(k => s.scarce.includes(k))) };
+  });
+  assert.ok(r.prices.cheapBuy < 0); assert.ok(r.prices.dearSell > 0);
+  assert.notEqual(r.farAway, 'grid'); assert.equal(r.inTown, 'grid'); assert.equal(r.listHasButton, false); assert.equal(r.distinct, true);
+}));
+
+test('starvation cuts production by 75% and recovers when fed', () => game(async page => {
+  const r = await page.evaluate(() => {
+    state.inv.wood = 50; state.inv.stone = 50; build('lumberMill'); state.town.tier = 4;
+    const day = () => { const b = state.inv.wood; advanceDay(); return state.inv.wood - b; };
+    state.town.food = 0; state.town.people = 2; const first = day(), starvingNow = state.starving;
+    const cut = day();                                    // pantry still empty: starving day
+    state.starving = false; state.town.food = 50; const normal = day(); const fedFlag = state.starving;
+    return { first, starvingNow, cut, normal, fedFlag };
+  });
+  assert.equal(r.starvingNow, true); assert.equal(r.normal, 8); assert.equal(r.cut, 2); assert.equal(r.fedFlag, false);
+}));
+
+test('fast travel is gone', () => game(async page => {
+  const r = await page.evaluate(() => { state.x = HOME.x + 15; render(); return { text: document.getElementById('actions').textContent, fn: typeof returnHome }; });
+  assert.ok(!r.text.includes('Return to Brackenford')); assert.equal(r.fn, 'undefined');
+}));
+
+test('autosave shows a notice on the day timer', () => game(async page => {
+  const t = await page.evaluate(() => { advanceDay(); return document.getElementById('toast').textContent; });
+  assert.match(t, /Autosaved/);
 }));
