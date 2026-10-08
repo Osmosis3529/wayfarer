@@ -31,6 +31,13 @@ Stand on the home tile (⌂) and press **E** to walk into Brackenford, a detaile
 - **Upgrades and evolution.** Every building has one upgrade per tier (+50% output for its workers). Buy *all* of a tier's upgrades and Brackenford evolves to the next tier: the hall grows, buildings hold more workers, the upgrade list resets, and each upgrade now costs more (x1, x2, x3). The City tier is the last one; once every upgrade is bought there, the settlement is fully evolved.
 - **Soldiers** are citizens assigned to the barracks. They patrol and fight near home, and the best weapon and armor you own set their damage and health.
 
+## War, soldiers and rival settlements
+
+- **Marching soldiers.** In the barracks (or the war council) set how many soldiers follow you, from none up to everyone assigned to the barracks. They keep up with you across the overworld, attack enemies near them, and join your fights: after each of your actions they strike, and the foe may turn on one of them instead of you. A fallen soldier is replaced for 2 meals. Use "send them home" to stand the marchers down. (They wait outside caves, mines, dungeons and the settlement.)
+- **Everyone to the barracks.** The war council can call every citizen to arms in one click (production stops), and "stand down" puts everyone back in their old jobs.
+- **Wars of conquest.** Once you have a barracks, declare war on any settlement you have found, from the war council in the hall or barracks, or from inside the settlement itself. Its citizens come out as town guards (and a captain) and hold the ground around their town. Beat every defender, with your own hands or your soldiers', and the settlement is annexed: plunder, a few survivors join Brackenford, room for 4 more citizens at home, and a daily tribute of coin and goods. Merchants close their gates while you are at war; you can make peace for coin, but they will remember it.
+- **Aggression.** Every other settlement has a size and a randomized temper (peaceful, wary or hostile) that drifts over time. Hostile ones raid Brackenford: raiders appear far from home, warn you, and march on the settlement. Cut them down before they reach it or they ransack the pantry. Driving off a raid pays a reward and cools the raiders down. Settlements also attack each other (you hear about the ones you have found), and a weak one can be taken over by its neighbor.
+
 ## Troubleshooting
 
 If `npm start` says "Electron failed to install correctly", npm may have blocked Electron's download script. Run `npm install-scripts approve electron` and then `npm install` again. If it still fails, unpack the cached download by hand:

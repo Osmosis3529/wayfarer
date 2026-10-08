@@ -98,7 +98,7 @@ function ensureSettlementState() {
   // Saves from before citizens had jobs: staff the existing buildings, one citizen each, until people run out.
   for (const k of JOB_KEYS) if (state.built[k] && !state.assign[k] && unassigned() > 0) state.assign[k] = 1;
 }
-function housingCap() { return state.built.hut ? [8, 16, 28][(state.town.tier || 1) - 1] : 2; }
+function housingCap() { return (state.built.hut ? [8, 16, 28][(state.town.tier || 1) - 1] : 2) + (typeof annexedCount === 'function' ? 4 * annexedCount() : 0); }
 function capacity(key) {
   if (!state.built[key]) return 0;
   if (key === 'barracks') return Infinity;
@@ -376,14 +376,15 @@ function mineDialog(key) { shopDialog(key, '<h3>The shaft</h3><button onclick="c
 function exitToMine() { map = overworld; state.zone = 'overworld'; state.x = HOME.x; state.y = HOME.y; enterInstance(homeMine, 'mine'); }
 function barracksDialog(key) {
   const soldiers = crew('barracks');
-  showDialog('<h2>' + esc(bld(key)) + '</h2>' + staffBlock(key) + '<p>' + soldiers + ' of ' + state.town.people + ' citizens serve as soldiers. Assign more from the ' + esc(hallName().toLowerCase()) + '.</p><button onclick="closeDialog()">Leave</button>');
+  showDialog('<h2>' + esc(bld(key)) + '</h2>' + staffBlock(key) + '<p>' + soldiers + ' of ' + state.town.people + ' citizens serve as soldiers. Assign more from the ' + esc(hallName().toLowerCase()) + '.</p>' + (soldiers ? escortControls('barracks') : '') +
+    '<button onclick="warCouncil()">War council</button><button onclick="closeDialog()">Leave</button>');
 }
 function beaconDialog() { showDialog('<h2>' + esc(bld('beacon')) + '</h2><p>The Beacon stands lit over Brackenford.</p><button onclick="closeDialog()">Leave</button>'); }
 function hallDialog() {
   const tier = state.town.tier || 1, prog = tierProgress(), goal = UPGRADE_KEYS.length;
   showDialog('<h2>' + esc(hallName()) + '</h2><p><strong>' + TIER_NAMES[tier] + '</strong> · ' + state.town.people + ' / ' + housingCap() + ' citizens · ' + unassigned() + ' without work · pantry ' + state.town.food + ' meals' + (state.starving ? ' (starving!)' : '') + '</p>' +
     '<p>Upgrades this tier: ' + prog + ' / ' + goal + (tier < 3 ? '. Buy them all and Brackenford evolves.' : (state.town.maxed ? '. Fully evolved.' : '. Buy them all to complete the City.')) + '</p>' +
-    '<button onclick="upgradesDialog()">Settlement upgrades</button><button onclick="citizensDialog()">Citizens and jobs</button><button onclick="hallRest()">Rest here · free</button><button onclick="closeDialog()">Leave</button>');
+    '<button onclick="upgradesDialog()">Settlement upgrades</button><button onclick="citizensDialog()">Citizens and jobs</button>' + (state.built.barracks ? '<button onclick="warCouncil()">War council</button>' : '') + '<button onclick="hallRest()">Rest here · free</button><button onclick="closeDialog()">Leave</button>');
 }
 function hallRest() { state.hp = state.maxHp; say('You rest in the ' + hallName().toLowerCase() + ' and recover all hearts.', 'gold'); render(); closeDialog(); }
 function upgradesDialog() {
@@ -463,7 +464,9 @@ function renderTown() {
     '<div class="town-metric">Citizens<b>' + state.town.people + ' / ' + housingCap() + '</b></div>' +
     '<div class="town-metric">Employed<b>' + employed() + ' · ' + unassigned() + ' without work</b></div>' +
     '<div class="town-metric">Pantry<b>' + state.town.food + ' meals' + (state.starving ? ' · starving' : '') + '</b></div>' +
-    '<div class="town-metric">Projects<b>' + built + ' / ' + Object.keys(state.built).length + ' built</b></div>';
+    '<div class="town-metric">Projects<b>' + built + ' / ' + Object.keys(state.built).length + ' built</b></div>' +
+    (annexedCount() ? '<div class="town-metric">Annexed<b>' + annexedCount() + ' settlement' + (annexedCount() === 1 ? '' : 's') + '</b></div>' : '') +
+    (state.raid ? '<div class="town-metric">Raid<b>' + state.raid.left + ' raiders from ' + esc(state.raid.name) + '</b></div>' : '');
   const rows = JOB_KEYS.filter(k => crew(k) > 0).map(k => '<div class="town-person"><b>' + esc(JOB_TITLES[k]) + (crew(k) > 1 ? ' ×' + crew(k) : '') + '</b><span>' + esc(buildingName(k)) + '</span></div>');
   if (unassigned() > 0) rows.push('<div class="town-person"><b>Citizen ×' + unassigned() + '</b><span>Waiting for work · assign at the ' + esc(hallName().toLowerCase()) + '</span></div>');
   document.getElementById('townfolk').innerHTML = rows.join('');
@@ -473,7 +476,7 @@ function renderTown() {
   if (!state.unlocked.huntersLodge) hints.push('Find or buy furs to unlock the hunters’ lodge.');
   if (!state.unlocked.gemHall) hints.push('Find or buy gems to unlock the gem hall.');
   hints.push('Buy every building upgrade of a tier and Brackenford evolves: the hall grows, buildings hold more workers, and a costlier round of upgrades opens. Each upgrade makes that building’s workers produce 50% more. Residents eat 1 meal a day; newcomers arrive while there is room and food.');
-  if (state.built.barracks) hints.push('Soldiers are citizens assigned to the barracks. They patrol the roads and the wilds near home; a fallen soldier is replaced for 2 meals.');
+  if (state.built.barracks) hints.push('Soldiers are citizens assigned to the barracks. They patrol the roads and the wilds near home, or march with you if you set a marching order; a fallen soldier is replaced for 2 meals. The war council (in the hall or barracks) declares wars: beat every defender of a settlement to annex it.');
   document.getElementById('town-hint').textContent = hints.join(' ');
 }
 

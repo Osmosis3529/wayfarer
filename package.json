@@ -35,6 +35,7 @@
       "wayfarer.html",
       "gfx.js",
       "settlement.js",
+      "war.js",
       "touch.js",
       "assets/**/*",
       "icon.ico",
