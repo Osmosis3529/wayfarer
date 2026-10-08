@@ -172,3 +172,23 @@ test('every town and site can be reached from home', () => game(async page => {
   });
   assert.deepEqual(r, { walledOff: true, unreachable: 0 });
 }));
+
+test('battle can be driven from the keyboard', () => game(async page => {
+  const r = await page.evaluate(() => {
+    state.x = HOME.x + 12; state.y = HOME.y; const x = state.x + 1, y = state.y;
+    overworld[y][x] = 'g'; enemyBucket(overworld).set(x + ',' + y, chooseEnemy('overworld'));
+    startCombat(x, y, state.x, state.y); return { hp: state.combat.hp, label: document.getElementById('item-button').textContent };
+  });
+  await page.keyboard.press('3');
+  const after = await page.evaluate(() => ({ guardedUsed: state.focus, log: state.log[1].t }));
+  assert.match(r.label, /\(4\)/); assert.ok(after.log.includes('guard'));
+}));
+
+test('text map fits the narrowest allowed window', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 900, height: 700 } });
+  const page = await ctx.newPage();
+  await page.goto(PAGE); await page.evaluate(() => { newWorld(); manualPause = true; render(); });
+  const overflow = await page.evaluate(() => { const m = document.getElementById('map'), w = m.parentElement; return w.scrollWidth - w.clientWidth; });
+  await ctx.close();
+  assert.ok(overflow <= 1, 'map wider than its panel by ' + overflow);
+});

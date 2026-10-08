@@ -13,7 +13,10 @@ rect(120,63,135,193,[25,43,32]);rect(63,120,193,135,[25,43,32]);
 // a winding trail and waypoint
 for(let y=83;y<180;y++){let x=Math.round(123+27*Math.sin((y-83)/96*Math.PI));circle(x,y,8,[227,202,145]);}
 circle(128,128,16,[198,116,73]);circle(128,128,7,[246,228,177]);
-const xor=Buffer.alloc(size*size*4);for(let y=0;y<size;y++)pixels.copy(xor,(size-1-y)*size*4,y*size*4,(y+1)*size*4)
-const mask=Buffer.alloc(Math.ceil(size/32)*4*size),dib=Buffer.alloc(40);dib.writeUInt32LE(40,0);dib.writeInt32LE(size,4);dib.writeInt32LE(size*2,8);dib.writeUInt16LE(1,12);dib.writeUInt16LE(32,14);dib.writeUInt32LE(0,16);dib.writeUInt32LE(xor.length+mask.length,20);
-const image=Buffer.concat([dib,xor,mask]);const header=Buffer.alloc(22);header.writeUInt16LE(0,0);header.writeUInt16LE(1,2);header.writeUInt16LE(1,4);header.writeUInt8(0,6);header.writeUInt8(0,7);header.writeUInt8(0,8);header.writeUInt8(0,9);header.writeUInt16LE(1,10);header.writeUInt16LE(32,12);header.writeUInt32LE(image.length,14);header.writeUInt32LE(22,18);
-fs.writeFileSync(path.join(__dirname,'icon.ico'),Buffer.concat([header,image]));
+// Box-filter the 256px art down to the smaller sizes Windows uses for the taskbar and Explorer.
+function scaled(n){const out=Buffer.alloc(n*n*4),f=size/n;for(let y=0;y<n;y++)for(let x=0;x<n;x++){const sum=[0,0,0,0];for(let sy=0;sy<f;sy++)for(let sx=0;sx<f;sx++){const i=((y*f+sy)*size+(x*f+sx))*4;for(let c=0;c<4;c++)sum[c]+=pixels[i+c]}for(let c=0;c<4;c++)out[(y*n+x)*4+c]=Math.round(sum[c]/(f*f))}return out}
+function bmp(n,px){const xor=Buffer.alloc(n*n*4);for(let y=0;y<n;y++)px.copy(xor,(n-1-y)*n*4,y*n*4,(y+1)*n*4);const mask=Buffer.alloc(Math.ceil(n/32)*4*n),dib=Buffer.alloc(40);dib.writeUInt32LE(40,0);dib.writeInt32LE(n,4);dib.writeInt32LE(n*2,8);dib.writeUInt16LE(1,12);dib.writeUInt16LE(32,14);dib.writeUInt32LE(0,16);dib.writeUInt32LE(xor.length+mask.length,20);return Buffer.concat([dib,xor,mask])}
+const sizes=[256,48,32,16],images=sizes.map(n=>bmp(n,n===size?pixels:scaled(n)));
+const header=Buffer.alloc(6+16*sizes.length);header.writeUInt16LE(0,0);header.writeUInt16LE(1,2);header.writeUInt16LE(sizes.length,4);
+let offset=header.length;sizes.forEach((n,k)=>{const e=6+16*k;header.writeUInt8(n===256?0:n,e);header.writeUInt8(n===256?0:n,e+1);header.writeUInt16LE(1,e+4);header.writeUInt16LE(32,e+6);header.writeUInt32LE(images[k].length,e+8);header.writeUInt32LE(offset,e+12);offset+=images[k].length});
+fs.writeFileSync(path.join(__dirname,'icon.ico'),Buffer.concat([header,...images]));
