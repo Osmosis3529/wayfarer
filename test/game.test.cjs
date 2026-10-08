@@ -24,7 +24,7 @@ async function game(fn) {
 }
 
 test('fox fur unlocks the hunters lodge', () => game(async page => {
-  const unlocked = await page.evaluate(() => { state.x = HOME.x + 12; state.y = HOME.y; map[state.y][state.x + 1] = 'x'; interact(); return state.unlocked.huntersLodge; });
+  const unlocked = await page.evaluate(() => { state.x = HOME.x + 12; state.y = HOME.y; for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) map[state.y + dy][state.x + dx] = '.'; map[state.y][state.x + 1] = 'x'; interact(); return state.unlocked.huntersLodge; });
   assert.equal(unlocked, true);
 }));
 
@@ -164,7 +164,7 @@ test('building buttons show the real costs and building deducts them', () => gam
 test('every town and site can be reached from home', () => game(async page => {
   const r = await page.evaluate(() => {
     const k = mines[0];
-    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === 2) overworld[k.y + dy][k.x + dx] = '≈';
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === 2 && !'SCDKM⌂'.includes(overworld[k.y + dy][k.x + dx])) overworld[k.y + dy][k.x + dx] = '≈';
     const walledOff = !reachableFromHome()[k.y][k.x];
     ensureReachable();
     const seen = reachableFromHome();
@@ -187,7 +187,7 @@ test('battle can be driven from the keyboard', () => game(async page => {
 test('text map fits the narrowest allowed window', async () => {
   const ctx = await browser.newContext({ viewport: { width: 900, height: 700 } });
   const page = await ctx.newPage();
-  await page.goto(PAGE); await page.evaluate(() => { newWorld(); manualPause = true; render(); });
+  await page.goto(PAGE); await page.evaluate(() => { newWorld(); manualPause = true; useGfx = false; render(); });
   const overflow = await page.evaluate(() => { const m = document.getElementById('map'), w = m.parentElement; return w.scrollWidth - w.clientWidth; });
   await ctx.close();
   assert.ok(overflow <= 1, 'map wider than its panel by ' + overflow);
@@ -297,4 +297,94 @@ test('fast travel is gone', () => game(async page => {
 test('autosave shows a notice on the day timer', () => game(async page => {
   const t = await page.evaluate(() => { advanceDay(); return document.getElementById('toast').textContent; });
   assert.match(t, /Autosaved/);
+}));
+
+test('sprite map draws on a canvas and the toggle switches back to text', () => game(async page => {
+  const r = await page.evaluate(() => {
+    render();
+    const cv = document.getElementById('view'), ctx = cv.getContext('2d');
+    const cx = Math.floor(cv.width / 2), cy = Math.floor(cv.height / 2);
+    const px = ctx.getImageData(cx - 3, cy, 1, 1).data;       // the player's cloak sits at the centre of the view
+    const sprites = { canvas: cv.style.display, text: document.getElementById('map').style.display, player: Array.from(px).slice(0, 3) };
+    toggleGfx(); const text = { canvas: cv.style.display, text: document.getElementById('map').style.display };
+    toggleGfx(); return { sprites, text };
+  });
+  assert.equal(r.sprites.canvas, 'block'); assert.equal(r.sprites.text, 'none');
+  assert.equal(r.text.canvas, 'none'); assert.equal(r.text.text, '');
+}));
+
+test('every enemy has its own portrait in the battle window', () => game(async page => {
+  const r = await page.evaluate(() => {
+    const shots = {};
+    for (const e of Object.values(enemyCatalog)) {
+      state.x = HOME.x + 12; state.y = HOME.y; const x = state.x + 1, y = state.y;
+      overworld[y][x] = 'g'; enemyBucket(overworld).set(x + ',' + y, { ...e });
+      startCombat(x, y, state.x, state.y); shots[e.name] = document.querySelector('#dialog img.portrait')?.src || null;
+      state.combat = null; closeDialog();
+    }
+    return shots;
+  });
+  const values = Object.values(r);
+  assert.ok(values.every(Boolean)); assert.equal(new Set(values).size, values.length);
+}));
+
+test('battle hotkeys work when a fight starts on its own in real time', async () => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  await page.goto(PAGE); await page.evaluate(() => {
+    newWorld(); state.x = HOME.x + 12; state.y = HOME.y;
+    for (let dx = -1; dx <= 5; dx++) for (let dy = -1; dy <= 1; dy++) overworld[state.y + dy][state.x + dx] = '.';
+    const x = state.x + 3, y = state.y; overworld[y][x] = 'g';
+    enemyBucket(overworld).set(x + ',' + y, { ...enemyCatalog.boar, level: 6, maxHp: 60, curHp: 60 });
+  });
+  await page.waitForFunction(() => !!state.combat, null, { timeout: 8000 });
+  const seen = [];
+  for (const key of ['1', '3', '2']) { await page.keyboard.press(key); await page.waitForTimeout(100); seen.push(await page.evaluate(() => state.log.slice(0, 3).map(l => l.t).join(' | '))); }
+  await ctx.close();
+  assert.ok(seen[0].includes('You attack') || seen[0].includes('strike'));
+  assert.ok(seen[1].includes('guard'));
+  assert.ok(/power strike|wake in Brackenford/.test(seen[2]));
+  assert.deepEqual(errors, []);
+});
+
+test('inventory shows an icon for every item and spent patches get their own sprite', () => game(async page => {
+  const r = await page.evaluate(() => {
+    render();
+    const icons = [...document.querySelectorAll('#inventory img.icon')].map(i => i.src);
+    state.x = HOME.x + 20; state.y = HOME.y; overworld[state.y][state.x + 2] = '♣';
+    const cv = document.getElementById('view'), ctx = cv.getContext('2d'), T = GFX.T;
+    const sample = () => { const d = ctx.getImageData((12 + 2) * T + 8, 7 * T + 4, 1, 1).data; return Array.from(d).join(','); };
+    render(); const fresh = sample();
+    for (let i = 0; i < 3; i++) state.nodes[nodeId(state.x + 2, state.y)] = { e: 0, t: state.clock, g: '♣' };
+    render(); const spent = sample();
+    return { count: icons.length, items: Object.keys(state.inv).length, distinct: new Set(icons).size, fresh, spent };
+  });
+  assert.equal(r.count, r.items); assert.ok(r.distinct >= r.items - 1);
+  assert.notEqual(r.fresh, r.spent);
+}));
+
+test('Kenney art skin loads, draws, and can be switched back', () => game(async page => {
+  const r = await page.evaluate(async () => {
+    toggleSkin(); await new Promise(r => setTimeout(r, 500));
+    const on = GFX.skinActive(); render(); const canvasOk = document.getElementById('view').width > 0;
+    toggleSkin(); await new Promise(r => setTimeout(r, 300));
+    return { on, off: !GFX.skinActive(), canvasOk, label: document.getElementById('skin-btn').textContent };
+  });
+  assert.deepEqual(r, { on: true, off: true, canvasOk: true, label: 'Art: handmade' });
+}));
+
+test('characters face the way they step and animate only while walking', () => game(async page => {
+  const r = await page.evaluate(() => {
+    state.x = HOME.x + 20; state.y = HOME.y; for (let dx = -2; dx <= 2; dx++) overworld[state.y][state.x + dx] = '.';
+    const idle = poseOf('player', performance.now(), 0);
+    move(-1, 0); const left = animState.get('player'), walkingNow = poseOf('player', performance.now(), 0);
+    const later = poseOf('player', performance.now() + 2000, 0);
+    state.inv.wood = 50; state.inv.stone = 50; build('lumberMill'); const w = state.workers[0];
+    w.x = HOME.x + 8; w.y = HOME.y + 8; for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) overworld[w.y + dy][w.x + dx] = '.';
+    noteStep(w.id, 1); const east = animState.get(w.id).fx; noteStep(w.id, -1); const west = animState.get(w.id).fx;
+    render();
+    return { idleWalking: idle.walking, facing: left.fx, walking: walkingNow.walking, lean: walkingNow.lean !== 0, later: later.walking, east, west, drawn: animating() };
+  });
+  assert.deepEqual(r, { idleWalking: false, facing: -1, walking: true, lean: true, later: false, east: 1, west: -1, drawn: true });
 }));
