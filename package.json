@@ -22,6 +22,7 @@
     "files": [
       "main.js",
       "wayfarer.html",
+      "gfx.js",
       "icon.ico",
       "package.json"
     ],
