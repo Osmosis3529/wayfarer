@@ -18,7 +18,7 @@ The world runs in real time (a day lasts 90 seconds); it pauses while a dialog o
 
 ## Goal
 
-Slay the Hollow King in the Hollow Keep (the farthest dungeon, marked K once found) to win a Sunstone, grow Brackenford into a City, then build the Wayfarer's Beacon.
+Five **guardians** hold ancient relics: two in dungeons, two at the bottom of mines, and one in a cave. Each relic is a permanent buff that is never lost when you die (Alpha's Fang: +2 damage, Warden's Aegis: +2 hearts, Delver's Lantern: see farther and gather +1, Heartstone Shard: berries heal 50% more, Mossback Hide: enemies hit 1 less). Slay all five and the road to the final dungeon, the **Hollow Keep**, appears on your map. Defeat the Hollow King there to win a Sunstone, grow Brackenford into a City, then build the Wayfarer's Beacon. Brackenford's panel lists which guardians are still at large and roughly where.
 
 ## Troubleshooting
 

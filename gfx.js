@@ -44,7 +44,7 @@ const ENEMY_ART={
  king:['y.y.y.y.','yyyyyyyy','.XXXXXX.','.XEXXEX.','.XXXXXX.','XXXXXXXX','.XX..XX.','.xx..xx.']
 };
 // name -> [art, main colour, dark colour, eye colour]
-const ENEMY_LOOK={'Briar Wolf':['beast','#8c968e','#4a524d','#f3de8f'],'Thornback Boar':['beast','#7a4f2b','#4a2f19','#f3de8f'],'Roadside Bandit':['humanoid','#6b4a2b','#3a2a1a','#ffffff'],'Thorn Stalker':['beast','#2f6b3a','#17381e','#f3de8f'],'Dire Wolf':['beast','#4a524d','#1c2220','#ff4a3a'],'Moss Troll':['brute','#4f8f3c','#2f5d34','#f3de8f'],'Tunnel Rat':['beast','#b89870','#6b5638','#ff6a5a'],'Kobold Delver':['humanoid','#b5483a','#7d2a24','#f3de8f'],'Cave Spider':['crawler','#3b3f45','#14181a','#ff4a3a'],'Crystal Guardian':['crystal','#7fb2d8','#3a6f9c','#ffffff'],'Deep Horror':['horror','#5a3a7a','#2b1a3d','#ff6ad0'],'Buried Wyrm':['horror','#8a5a2b','#4a2f19','#ffd23a'],'Restless Skeleton':['undead','#d8dcd0','#5b6660','#ff4a3a'],'Grave Cultist':['humanoid','#5a2a6a','#2b1236','#ff8a3a'],'Barrow Ghoul':['undead','#8fb39a','#3a5a46','#ffe36a'],'Hollow Wraith':['undead','#9fb7d8','#4a5a78','#ffffff'],'Crypt Ogre':['brute','#8a6a4a','#4a3a2a','#f3de8f'],'Forgotten Warden':['brute','#6a6f73','#2b3330','#ff4a3a'],'The Hollow King':['king','#c9c2a8','#4a4538','#ff4a3a']};
+const ENEMY_LOOK={'Briar Wolf':['beast','#8c968e','#4a524d','#f3de8f'],'Thornback Boar':['beast','#7a4f2b','#4a2f19','#f3de8f'],'Roadside Bandit':['humanoid','#6b4a2b','#3a2a1a','#ffffff'],'Thorn Stalker':['beast','#2f6b3a','#17381e','#f3de8f'],'Dire Wolf':['beast','#4a524d','#1c2220','#ff4a3a'],'Moss Troll':['brute','#4f8f3c','#2f5d34','#f3de8f'],'Tunnel Rat':['beast','#b89870','#6b5638','#ff6a5a'],'Kobold Delver':['humanoid','#b5483a','#7d2a24','#f3de8f'],'Cave Spider':['crawler','#3b3f45','#14181a','#ff4a3a'],'Crystal Guardian':['crystal','#7fb2d8','#3a6f9c','#ffffff'],'Deep Horror':['horror','#5a3a7a','#2b1a3d','#ff6ad0'],'Buried Wyrm':['horror','#8a5a2b','#4a2f19','#ffd23a'],'Restless Skeleton':['undead','#d8dcd0','#5b6660','#ff4a3a'],'Grave Cultist':['humanoid','#5a2a6a','#2b1236','#ff8a3a'],'Barrow Ghoul':['undead','#8fb39a','#3a5a46','#ffe36a'],'Hollow Wraith':['undead','#9fb7d8','#4a5a78','#ffffff'],'Crypt Ogre':['brute','#8a6a4a','#4a3a2a','#f3de8f'],'Forgotten Warden':['brute','#6a6f73','#2b3330','#ff4a3a'],'Hollowfang, the Pale Alpha':['beast','#d8dcd0','#7a8480','#ff4a3a'],'Brannoch, the Iron Warden':['brute','#8c968e','#3b4540','#e5bd69'],'Gorrak, the Delver King':['humanoid','#d9822b','#7a4a14','#ffffff'],'Ilvara, the Crystal Wyrm':['crystal','#e0508a','#7a2a4a','#ffffff'],'Old Mossback':['brute','#4f8f3c','#2f5d34','#e5bd69'],'The Hollow King':['king','#c9c2a8','#4a4538','#ff4a3a']};
 const ICONS={
  wood:{p:['........','..nnnn..','.nNNNNn.','nNnyynNn','nNnyynNn','.nNNNNn.','..nnnn..','........']},
  stone:{p:['........','...AA...','..AAWA..','.AAAAaA.','.AaAAaaA','AaaAaKaa','aKaaaKKa','.KKKKKK.']},
@@ -56,6 +56,11 @@ const ICONS={
  gold:{p:['........','........','..XXXXX.','.XYYYYXX','XXXXXXX.','XxxxxxX.','........','........'],o:{X:'#e5bd69',Y:'#fff2a8',x:'#9a7a2b'}},
  furs:{p:['..oooo..','.oOOOOo.','oOOOOOOo','oOoOOoOo','.oOOOOo.','.oO..Oo.','.o....o.','........'],o:{o:'#8a5a2b',O:'#c0803a'}},
  gems:{p:['........','..PPPP..','.PWPPpP.','PPPPPPpP','.PPPPpP.','..PPpP..','...pp...','........']},
+ relic_fang:{p:['.WWWW...','..WWWW..','..WWW...','...WW...','...WW...','....W...','........','........'],o:{W:'#e8e4d0'}},
+ relic_aegis:{p:['.aaaaaa.','aAAAAAAa','aArAArAa','aArrrrAa','aAArrAAa','.aAArAa.','..aAAa..','...aa...']},
+ relic_lantern:{p:['...nn...','..yyyy..','.yYYYYy.','.yYWWYy.','.yYWWYy.','.yYYYYy.','..yyyy..','..nnnn..']},
+ relic_heartstone:{p:['.rr..rr.','rRRrrRRr','rRRRRRRr','.rRRRRr.','..rRRr..','...rr...','........','........'],o:{r:'#e0508a',R:'#ff8ab8'}},
+ relic_mossback:{p:['.GGGGGG.','GgGGgGGG','GGGGGGgG','gGGgGGGG','GGGGGGGg','GGgGGgGG','.GGGGGG.','..G..G..'],o:{G:'#4f8f3c',g:'#2f5d34'}},
  sunstone:{p:['..yyyy..','.yYYYYy.','yYYWWYYy','yYWWWWYy','yYWWWWYy','yYYWWYYy','.yYYYYy.','..yyyy..']}
 };
 const iconCache={};

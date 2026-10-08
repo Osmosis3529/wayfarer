@@ -100,7 +100,7 @@ test('death takes loot and coin; the enemy keeps its wounds', () => game(async p
 
 test('boss, sunstone and beacon win', () => game(async page => {
   const r = await page.evaluate(() => {
-    const k = dungeons.find(d => d.boss); const glyph = overworld[k.y][k.x];
+    const k = dungeons.find(d => d.boss); state.relics = { fang: 1 }; revealKeep(); const glyph = overworld[k.y][k.x];
     state.x = k.x; state.y = k.y; state.level = 5; enterInstance(k, 'dungeon');
     const bx = map[0].length - 4, mid = Math.floor(map.length / 2);
     state.x = bx - 1; state.y = mid; startCombat(bx, mid, state.x, state.y);
@@ -126,7 +126,7 @@ test('overworld enemies respawn up to the cap', () => game(async page => {
 
 test('dungeons refill only after every foe is defeated', () => game(async page => {
   const r = await page.evaluate(() => {
-    const k = dungeons.find(d => !d.boss), awayFor = ms => { exitInstance(); state.clock += ms; state.x = k.x; state.y = k.y; enterInstance(k, 'dungeon'); };
+    const k = dungeons.find(d => !d.boss && !d.miniBoss), awayFor = ms => { exitInstance(); state.clock += ms; state.x = k.x; state.y = k.y; enterInstance(k, 'dungeon'); };
     state.x = k.x; state.y = k.y; enterInstance(k, 'dungeon'); const m = map, count = () => m.flat().filter(c => c === 'g').length;
     let last = null; for (let y = 0; y < m.length; y++) for (let x = 0; x < m[0].length; x++) if (m[y][x] === 'g') { if (!last) last = [x, y]; else { m[y][x] = '.'; enemyBucket(m).delete(x + ',' + y); } }
     awayFor(INSTANCE_RESPAWN_MS * 100); const whileOneAlive = count();
@@ -463,4 +463,76 @@ test('going to the background autosaves', () => phone(async page => {
     return saved;
   });
   assert.equal(r, 91);
+}));
+
+// ---- guardians, relics and the hidden final dungeon ----
+test('five guardians are placed in separate lairs, and the final dungeon starts hidden', () => game(async page => {
+  const r = await page.evaluate(() => {
+    const sites = miniBossSites(), keys = sites.map(t => t.miniBoss), keep = dungeons.find(d => d.boss);
+    state.x = keep.x; state.y = keep.y; const before = overworld[keep.y][keep.x]; interact(); const entered = state.zone;
+    return { n: sites.length, distinct: new Set(keys).size, ids: new Set(sites.map(t => t.id)).size, kinds: [dungeons, mines, caves].map(l => l.filter(t => t.miniBoss).length), keepGlyph: before, entered, keepIsGuardian: !!keep.miniBoss };
+  });
+  assert.deepEqual(r, { n: 5, distinct: 5, ids: 5, kinds: [2, 2, 1], keepGlyph: '.', entered: 'overworld', keepIsGuardian: false });
+}));
+
+test('defeating a guardian grants a relic with its effect, and relics survive death', () => game(async page => {
+  const r = await page.evaluate(() => {
+    const fight = (site, depth) => {
+      state.x = site.x; state.y = site.y; enterInstance(site, site === undefined ? 'x' : (dungeons.includes(site) ? 'dungeon' : mines.includes(site) ? 'mine' : 'cave'));
+      if (depth) { state.mineDepth = depth; state.site.layers = state.site.layers || {}; if (!state.site.layers[depth]) state.site.layers[depth] = makeInstance('mine', depth, site); map = state.site.layers[depth]; ensureBoss(site, map, depth); }
+      let pos = null; for (const [k, e] of enemyBucket(map)) { const [x, y] = k.split(',').map(Number); if (e.mini && map[y][x] === 'g') pos = [x, y]; }
+      state.x = pos[0] - 1; state.y = pos[1]; startCombat(pos[0], pos[1], state.x, state.y); const boss = state.combat.enemy.name;
+      state.combat.hp = 1; battleAction('heavy'); closeDialog(); return boss;
+    };
+    const dun = dungeons.find(d => d.miniBoss === 'aegis'), maxHp0 = state.maxHp, lvl0 = state.level;
+    const boss = fight(dun); const got = { relic: state.relics.aegis, hearts: state.maxHp - maxHp0 - (state.level - lvl0) };   // minus the hearts from levelling up
+    exitInstance(); state.coin = 100; state.inv.wood = 10; state.hp = 1; state.x = HOME.x + 12; state.y = HOME.y;
+    const x = state.x + 1, y = state.y; overworld[y][x] = 'g'; enemyBucket(overworld).set(x + ',' + y, { ...enemyCatalog.wolf }); startCombat(x, y, state.x, state.y); state.combat.enemy.attack = 99; enemyTurn();
+    return { boss, got, afterDeath: state.relics.aegis, woodLost: state.inv.wood < 10, left: miniBossSites().filter(t => !state.relics[t.miniBoss]).length };
+  });
+  assert.equal(r.boss, 'Brannoch, the Iron Warden'); assert.deepEqual(r.got, { relic: true, hearts: 2 });
+  assert.equal(r.afterDeath, true); assert.equal(r.woodLost, true); assert.equal(r.left, 4);
+}));
+
+test('each relic changes the game as described', () => game(async page => {
+  const r = await page.evaluate(() => {
+    const out = {};
+    showDialog('<div id="enemy-hp"></div><div id="battle-status"></div><button id="heavy-button"></button><button id="item-button"></button>');
+    state.maxHp = 10; out.healBase = healAmount(); state.relics.heartstone = true; out.healRelic = healAmount();
+    const area = () => { state.explored.forEach(r => r.fill(false)); state.x = HOME.x; state.y = HOME.y; revealArea(); return state.explored.flat().filter(Boolean).length; };
+    out.sightBase = area(); state.relics.lantern = true; out.sightRelic = area();
+    state.x = HOME.x + 20; state.y = HOME.y; for (let dx = -1; dx <= 2; dx++) for (let dy = -1; dy <= 1; dy++) overworld[state.y + dy][state.x + dx] = '.'; overworld[state.y][state.x + 1] = '♣';
+    const w0 = state.inv.wood; interact(); out.gatherRelic = state.inv.wood - w0;
+    const hit = () => { state.hp = 99; state.maxHp = 99; state.combat = { x: 0, y: 0, enemy: { name: 'Test', attack: 1.2 }, level: 20, hp: 5, maxHp: 5, guarded: false }; const h0 = state.hp; enemyTurn(); const lost = h0 - state.hp; state.combat = null; return lost; };
+    const rnd = Math.random; Math.random = () => 0.9;   // fixed rolls so the two runs are comparable
+    let base = 0, rel = 0; state.relics.mossback = false; for (let i = 0; i < 40; i++) base += hit(); state.relics.mossback = true; for (let i = 0; i < 40; i++) rel += hit();
+    Math.random = rnd; out.mossback = base - rel;
+    return out;
+  });
+  assert.equal(r.healBase, 3); assert.equal(r.healRelic, 5); assert.ok(r.sightRelic > r.sightBase * 1.5); assert.equal(r.gatherRelic, 3); assert.ok(r.mossback >= 38 && r.mossback <= 40);
+}));
+
+test('slaying every guardian reveals the final dungeon', () => game(async page => {
+  const r = await page.evaluate(() => {
+    const keep = dungeons.find(d => d.boss), sites = miniBossSites();
+    for (const t of sites.slice(0, 4)) grantRelic(t.miniBoss);
+    const hiddenAt4 = [state.keepRevealed, overworld[keep.y][keep.x], goalHint().includes('Still hunting')];
+    grantRelic(sites[4].miniBoss);
+    state.x = keep.x; state.y = keep.y; interact(); const entered = state.zone; exitInstance();
+    return { hiddenAt4, revealed: state.keepRevealed, glyph: overworld[keep.y][keep.x], entered, hint: goalHint().includes('Hollow King') };
+  });
+  assert.deepEqual(r, { hiddenAt4: [false, '.', true], revealed: true, glyph: 'K', entered: 'dungeon', hint: true });
+}));
+
+test('relics and the reveal survive saving, and old saves keep the old goal', () => game(async page => {
+  const r = await page.evaluate(() => {
+    const t = miniBossSites()[0]; grantRelic(t.miniBoss); saveWorld();
+    const data = JSON.parse(localStorage.getItem(SAVE_KEY)); state.relics = {}; hydrateWorld(data); manualPause = true;
+    const kept = !!state.relics[t.miniBoss];
+    const legacy = JSON.parse(localStorage.getItem(SAVE_KEY)); delete legacy.state.relics; delete legacy.state.keepRevealed;
+    const keep = legacy.dungeons.find(d => d.boss); legacy.overworld[keep.y][keep.x] = '.'; legacy.dungeons.forEach(d => delete d.miniBoss); legacy.mines.forEach(d => delete d.miniBoss); legacy.caves.forEach(d => delete d.miniBoss);
+    hydrateWorld(legacy); manualPause = true;
+    return { kept, legacyRevealed: state.keepRevealed, legacyGlyph: overworld[keep.y][keep.x], guardians: miniBossSites().length };
+  });
+  assert.deepEqual(r, { kept: true, legacyRevealed: true, legacyGlyph: 'K', guardians: 5 });
 }));
