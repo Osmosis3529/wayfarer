@@ -25,6 +25,8 @@ const P={
  dungeon:['a.aaaa.a','aaAAAAaa','aAkkkkAa','aAkRRkAa','aAkRRkAa','aAkkkkAa','aaAAAAaa','aaaaaaaa'],
  keep:['y.y..y.y','kkkkkkkk','kKKKKKKk','kKrKKrKk','kKKKKKKk','kKkkkkKk','kKkRRkKk','kkkkkkkk'],
  mine:['..nnnn..','.nkkkkn.','nNkkkkNn','nNkkkkNn','nNkkkkNn','aaaaaaaa','........','........'],
+ treeSpent:['........','........','...nn...','..nNNn..','.nNyyNn.','.nNNNNn.','.nnnnnn.','..nKKn..'],
+ rockSpent:['........','........','........','........','..AaA...','.AaaKaA.','aKaaaKKa','.KKKKKK.'],
  stairL:['....y...','...yy...','..yyyyyy','.yyyyyyy','..yyyyyy','...yy...','....y...','........'],
  stairR:['...y....','...yy...','yyyyyy..','yyyyyyy.','yyyyyy..','...yy...','...y....','........']
 };
@@ -43,6 +45,21 @@ const ENEMY_ART={
 };
 // name -> [art, main colour, dark colour, eye colour]
 const ENEMY_LOOK={'Briar Wolf':['beast','#8c968e','#4a524d','#f3de8f'],'Thornback Boar':['beast','#7a4f2b','#4a2f19','#f3de8f'],'Roadside Bandit':['humanoid','#6b4a2b','#3a2a1a','#ffffff'],'Thorn Stalker':['beast','#2f6b3a','#17381e','#f3de8f'],'Dire Wolf':['beast','#4a524d','#1c2220','#ff4a3a'],'Moss Troll':['brute','#4f8f3c','#2f5d34','#f3de8f'],'Tunnel Rat':['beast','#b89870','#6b5638','#ff6a5a'],'Kobold Delver':['humanoid','#b5483a','#7d2a24','#f3de8f'],'Cave Spider':['crawler','#3b3f45','#14181a','#ff4a3a'],'Crystal Guardian':['crystal','#7fb2d8','#3a6f9c','#ffffff'],'Deep Horror':['horror','#5a3a7a','#2b1a3d','#ff6ad0'],'Buried Wyrm':['horror','#8a5a2b','#4a2f19','#ffd23a'],'Restless Skeleton':['undead','#d8dcd0','#5b6660','#ff4a3a'],'Grave Cultist':['humanoid','#5a2a6a','#2b1236','#ff8a3a'],'Barrow Ghoul':['undead','#8fb39a','#3a5a46','#ffe36a'],'Hollow Wraith':['undead','#9fb7d8','#4a5a78','#ffffff'],'Crypt Ogre':['brute','#8a6a4a','#4a3a2a','#f3de8f'],'Forgotten Warden':['brute','#6a6f73','#2b3330','#ff4a3a'],'The Hollow King':['king','#c9c2a8','#4a4538','#ff4a3a']};
+const ICONS={
+ wood:{p:['........','..nnnn..','.nNNNNn.','nNnyynNn','nNnyynNn','.nNNNNn.','..nnnn..','........']},
+ stone:{p:['........','...AA...','..AAWA..','.AAAAaA.','.AaAAaaA','AaaAaKaa','aKaaaKKa','.KKKKKK.']},
+ berries:{p:P.berry},
+ relic:{p:['..yyyy..','.yYYYYy.','yYyyyyYy','yYyYYyYy','yYyYYyYy','yYyyyyYy','.yYYYYy.','..yyyy..']},
+ copper:{p:['........','........','..XXXXX.','.XYYYYXX','XXXXXXX.','XxxxxxX.','........','........'],o:{X:'#d9822b',Y:'#f0a860',x:'#8a4a14'}},
+ iron:{p:['........','........','..XXXXX.','.XYYYYXX','XXXXXXX.','XxxxxxX.','........','........'],o:{X:'#8a95a5',Y:'#c0c8d2',x:'#4a5360'}},
+ silver:{p:['........','........','..XXXXX.','.XYYYYXX','XXXXXXX.','XxxxxxX.','........','........'],o:{X:'#cfd6dc',Y:'#ffffff',x:'#8c968e'}},
+ gold:{p:['........','........','..XXXXX.','.XYYYYXX','XXXXXXX.','XxxxxxX.','........','........'],o:{X:'#e5bd69',Y:'#fff2a8',x:'#9a7a2b'}},
+ furs:{p:['..oooo..','.oOOOOo.','oOOOOOOo','oOoOOoOo','.oOOOOo.','.oO..Oo.','.o....o.','........'],o:{o:'#8a5a2b',O:'#c0803a'}},
+ gems:{p:['........','..PPPP..','.PWPPpP.','PPPPPPpP','.PPPPpP.','..PPpP..','...pp...','........']},
+ sunstone:{p:['..yyyy..','.yYYYYy.','yYYWWYYy','yYWWWWYy','yYWWWWYy','yYYWWYYy','.yYYYYy.','..yyyy..']}
+};
+const iconCache={};
+function icon(key){if(!ICONS[key])return '';if(!iconCache[key]){const s=build(ICONS[key].p,ICONS[key].o),c=document.createElement('canvas');c.width=c.height=24;const x=c.getContext('2d');x.imageSmoothingEnabled=false;x.drawImage(s,0,0,24,24);iconCache[key]=c.toDataURL()}return iconCache[key]}
 const cache={};
 const portraits={};
 function build(pat,over){const c=document.createElement('canvas');c.width=c.height=T;const x=c.getContext('2d');pat.forEach((row,j)=>{for(let i=0;i<8;i++){const ch=row[i];if(ch==='.')continue;const col=(over&&over[ch])||PAL[ch];if(!col)continue;x.fillStyle=col;x.fillRect(i*2,j*2,2,2)}});return c}
@@ -51,6 +68,7 @@ for(const [k,[roof,em]] of Object.entries(HOUSES))cache['b_'+k]=build(P.house,{X
 for(const [g,col] of Object.entries(ORES))cache['ore_'+g]=build(P.ore,{X:col});
 function enemySprite(name){const look=ENEMY_LOOK[name]||['beast','#8c968e','#4a524d','#ff4a3a'];return build(ENEMY_ART[look[0]],{X:look[1],x:look[2],E:look[3]})}
 function portrait(name){if(!portraits[name]){const s=enemySprite(name),c=document.createElement('canvas');c.width=c.height=96;const x=c.getContext('2d');x.imageSmoothingEnabled=false;x.fillStyle='#111a14';x.fillRect(0,0,96,96);x.drawImage(s,8,8,80,80);portraits[name]=c.toDataURL()}return portraits[name]}
+cache.tree_spent=build(P.treeSpent);cache.rock_spent=build(P.rockSpent);cache.berry_spent=build(P.berry,{r:'#4f8f3c'});cache.ore_spent=build(P.ore,{X:'#3b4540'});
 cache.b_garden=cache.farm;cache.b_well=cache.well;cache.b_huntingCamp=cache.camp;cache.b_beacon=cache.beacon;
 const SPRITE_OF={'♣':'tree','▲':'rock','%':'berry','?':'chest','g':'enemy','x':'fox','C':'cave','D':'dungeon','K':'keep','M':'mine','S':'town','⌂':'home','<':'stairL','>':'stairR',c:'ore_c',i:'ore_i',s:'ore_s',a:'ore_a','◆':'ore_◆'};
 function hash(x,y){return (Math.imul(x,73856093)^Math.imul(y,19349663))>>>0}
@@ -66,5 +84,5 @@ function sprite(ctx,key,px,py,alpha,flip){const s=cache[key];if(!s)return;ctx.sa
 function bar(ctx,px,py,frac){ctx.fillStyle='#14181a';ctx.fillRect(px+1,py,T-2,3);ctx.fillStyle=frac>.5?'#7fbf5a':frac>.25?'#e5bd69':'#df4a3a';ctx.fillRect(px+2,py+1,Math.max(1,Math.round((T-4)*frac)),1)}
 function tint(ctx,w,h,a){if(a<=0)return;ctx.fillStyle='rgba(10,20,60,'+a.toFixed(3)+')';ctx.fillRect(0,0,w,h)}
 const OV={'.':'#34603a','≈':'#2e5f86','♣':'#255a2c','▲':'#8c968e','%':'#b5483a','#':'#2b3330','?':'#c4a0dc','g':'#df4a3a','x':'#d9822b','C':'#8fc4b2','D':'#e58b72','K':'#ff5a4a','M':'#9a6c3f','⌂':'#e5bd69','S':'#e5bd69',c:'#d9822b',i:'#5a7fa8',s:'#ffffff',a:'#f3d44a','◆':'#c46bf0','<':'#e5bd69','>':'#e5bd69'};
-return {T,base,sprite,bar,tint,portrait,SPRITE_OF,overview:c=>OV[c]||'#34603a'};
+return {T,base,sprite,bar,tint,portrait,icon,SPRITE_OF,overview:c=>OV[c]||'#34603a'};
 })();

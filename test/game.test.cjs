@@ -327,3 +327,38 @@ test('every enemy has its own portrait in the battle window', () => game(async p
   const values = Object.values(r);
   assert.ok(values.every(Boolean)); assert.equal(new Set(values).size, values.length);
 }));
+
+test('battle hotkeys work when a fight starts on its own in real time', async () => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  await page.goto(PAGE); await page.evaluate(() => {
+    newWorld(); state.x = HOME.x + 12; state.y = HOME.y;
+    const x = state.x + 3, y = state.y; overworld[y][x] = 'g';
+    enemyBucket(overworld).set(x + ',' + y, { ...enemyCatalog.boar, level: 6, maxHp: 60, curHp: 60 });
+  });
+  await page.waitForFunction(() => !!state.combat, null, { timeout: 8000 });
+  const seen = [];
+  for (const key of ['1', '3', '2']) { await page.keyboard.press(key); await page.waitForTimeout(100); seen.push(await page.evaluate(() => state.log.slice(0, 3).map(l => l.t).join(' | '))); }
+  await ctx.close();
+  assert.ok(seen[0].includes('You attack') || seen[0].includes('strike'));
+  assert.ok(seen[1].includes('guard'));
+  assert.ok(/power strike|wake in Brackenford/.test(seen[2]));
+  assert.deepEqual(errors, []);
+});
+
+test('inventory shows an icon for every item and spent patches get their own sprite', () => game(async page => {
+  const r = await page.evaluate(() => {
+    render();
+    const icons = [...document.querySelectorAll('#inventory img.icon')].map(i => i.src);
+    state.x = HOME.x + 20; state.y = HOME.y; overworld[state.y][state.x + 2] = '♣';
+    const cv = document.getElementById('view'), ctx = cv.getContext('2d'), T = GFX.T;
+    const sample = () => { const d = ctx.getImageData((12 + 2) * T + 8, 7 * T + 4, 1, 1).data; return Array.from(d).join(','); };
+    render(); const fresh = sample();
+    for (let i = 0; i < 3; i++) state.nodes[nodeId(state.x + 2, state.y)] = { e: 0, t: state.clock, g: '♣' };
+    render(); const spent = sample();
+    return { count: icons.length, items: Object.keys(state.inv).length, distinct: new Set(icons).size, fresh, spent };
+  });
+  assert.equal(r.count, r.items); assert.ok(r.distinct >= r.items - 1);
+  assert.notEqual(r.fresh, r.spent);
+}));
