@@ -7,11 +7,13 @@
   "license": "UNLICENSED",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win nsis"
+    "dist": "electron-builder --win nsis",
+    "test": "node --test test/*.test.cjs"
   },
   "devDependencies": {
-    "electron": "^37.2.6",
-    "electron-builder": "^26.0.12"
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3",
+    "playwright-core": "^1.56.1"
   },
   "build": {
     "appId": "com.wayfarer.game",
@@ -37,5 +39,6 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Wayfarer"
     }
-  }
+  },
+  "private": true
 }
