@@ -388,3 +388,79 @@ test('characters face the way they step and animate only while walking', () => g
   });
   assert.deepEqual(r, { idleWalking: false, facing: -1, walking: true, lean: true, later: false, east: 1, west: -1, drawn: true });
 }));
+
+// ---- phone / touch mode (landscape) ----
+async function phone(fn, viewport = { width: 915, height: 412 }) {
+  const ctx = await browser.newContext({ viewport, hasTouch: true, isMobile: true });
+  const page = await ctx.newPage();
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  await page.goto(PAGE + '?touch=1');
+  await page.evaluate(() => { newWorld(); });
+  try { await fn(page); } finally { await ctx.close(); }
+  assert.deepEqual(errors, [], 'page errors');
+}
+
+test('phone layout fits a landscape screen with no scrolling', () => phone(async page => {
+  const r = await page.evaluate(() => {
+    const cv = document.getElementById('view').getBoundingClientRect(), dp = document.getElementById('dpad').getBoundingClientRect();
+    return { touch: document.body.classList.contains('touch'), sx: document.documentElement.scrollWidth - innerWidth, sy: document.documentElement.scrollHeight - innerHeight,
+      canvasBottom: Math.round(cv.bottom), canvasW: Math.round(cv.width), dpadVisible: dp.width > 0, rotate: getComputedStyle(document.getElementById('rotate-hint')).display, h: innerHeight };
+  });
+  assert.equal(r.touch, true); assert.ok(r.sx <= 0 && r.sy <= 0, JSON.stringify(r)); assert.ok(r.canvasBottom <= r.h); assert.ok(r.dpadVisible); assert.equal(r.rotate, 'none');
+}));
+
+test('holding the on-screen pad walks, and the buttons act', () => phone(async page => {
+  const r = await page.evaluate(async () => {
+    manualPause = false; state.x = HOME.x + 20; state.y = HOME.y; for (let dx = -8; dx <= 8; dx++) for (let dy = -1; dy <= 1; dy++) overworld[state.y + dy][state.x + dx] = '.';
+    const x0 = state.x, btn = document.querySelector('#dpad [data-dir=left]');
+    btn.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
+    await new Promise(r => setTimeout(r, 500));
+    btn.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 }));
+    const walked = x0 - state.x; await new Promise(r => setTimeout(r, 400)); const stopped = x0 - state.x === walked;
+    state.hp = 1; state.maxHp = 10; state.inv.berries = 1;
+    document.getElementById('t-eat').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 2 }));
+    return { walked, stopped, hp: state.hp, facing };
+  });
+  assert.ok(r.walked >= 3, 'walked ' + r.walked); assert.equal(r.stopped, true); assert.ok(r.hp > 1); assert.equal(r.facing, -1);
+}));
+
+test('the menu drawer opens, pauses the world, and holds the side panels', () => phone(async page => {
+  const r = await page.evaluate(async () => {
+    manualPause = false; await new Promise(r => setTimeout(r, 300)); const closed = document.getElementById('log').getBoundingClientRect().left >= innerWidth - 1;
+    document.getElementById('t-menu').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
+    await new Promise(r => setTimeout(r, 400));
+    const open = document.getElementById('log').getBoundingClientRect().left < innerWidth - 100;
+    const c0 = state.clock; await new Promise(r => setTimeout(r, 600)); const frozen = state.clock === c0;
+    const tools = [...document.querySelectorAll('#drawer-tools button')].map(b => b.textContent);
+    document.getElementById('drawer-close').click(); await new Promise(r => setTimeout(r, 300));
+    const c1 = state.clock; await new Promise(r => setTimeout(r, 600));
+    return { closed, open, frozen, tools: tools.length, resumed: state.clock > c1 };
+  });
+  assert.deepEqual(r, { closed: true, open: true, frozen: true, tools: r.tools, resumed: true }); assert.ok(r.tools >= 4);
+}));
+
+test('portrait shows a rotate hint, and battle dialogs fit a short screen', async () => {
+  await phone(async page => {
+    assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('rotate-hint')).display), 'grid');
+  }, { width: 412, height: 915 });
+  await phone(async page => {
+    const r = await page.evaluate(() => {
+      manualPause = true; state.x = HOME.x + 12; state.y = HOME.y; const x = state.x + 1, y = state.y;
+      overworld[y][x] = 'g'; enemyBucket(overworld).set(x + ',' + y, { ...enemyCatalog.troll }); startCombat(x, y, state.x, state.y);
+      const d = document.getElementById('dialog').getBoundingClientRect(); return { top: d.top, bottom: d.bottom, h: innerHeight, right: d.right, w: innerWidth };
+    });
+    assert.ok(r.top >= 0 && r.bottom <= r.h && r.right <= r.w, JSON.stringify(r));
+  }, { width: 740, height: 360 });
+});
+
+test('going to the background autosaves', () => phone(async page => {
+  const r = await page.evaluate(async () => {
+    localStorage.removeItem(AUTOSAVE_KEY); state.coin = 91;
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    document.dispatchEvent(new Event('visibilitychange'));
+    const saved = JSON.parse(localStorage.getItem(AUTOSAVE_KEY)).state.coin;
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+    return saved;
+  });
+  assert.equal(r, 91);
+}));
