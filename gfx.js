@@ -113,6 +113,80 @@ async function setSkin(name){
  skinBase.grass=[[5,0],[5,1],[5,0],[5,1],[5,0]].map(([c,r])=>cut(skinSheets.rpg,c,r));skinBase.floor=[[7,0],[7,1],[7,0]].map(([c,r])=>cut(skinSheets.rpg,c,r));skinBase.wall=[[6,2],[6,3]].map(([c,r])=>cut(skinSheets.rpg,c,r));skinBase.water=[[0,0],[1,0]].map(([c,r])=>cut(skinSheets.rpg,c,r));
  for(const k of Object.keys(portraits))delete portraits[k];
  skinOn=true;return true}
+// ---- Settlement map art (always handmade): ground tiles, plus whole buildings painted once and sliced per tile ----
+const shade=(hex,f)=>{const n=parseInt(hex.slice(1),16),m=f<0?0:255,t=Math.abs(f),ch=v=>Math.round(v+(m-v)*t);return '#'+[(n>>16)&255,(n>>8)&255,n&255].map(v=>ch(v).toString(16).padStart(2,'0')).join('')};
+function townTile(ctx,g,x,y,px,py,frame,edges){
+ const h=hash(x,y);
+ if(g==='▒'||g==='▼'){
+  ctx.fillStyle='#a38a5c';ctx.fillRect(px,py,T,T);
+  for(let k=0;k<5;k++){const sx=(h>>(k*4))&15,sy=(h>>(k*4+2))&15;ctx.fillStyle=k%2?'#8f784c':'#b8a070';ctx.fillRect(px+sx,py+sy,2,1)}
+  if(g==='▼'){ctx.fillStyle='#4a3a22';ctx.fillRect(px,py,3,T);ctx.fillRect(px+T-3,py,3,T);ctx.fillStyle='#e5bd69';ctx.fillRect(px+3,py+T-3,T-6,2)}
+  return}
+ if(g==='▓'){
+  ctx.fillStyle='#9a9a90';ctx.fillRect(px,py,T,T);ctx.fillStyle='#85857c';ctx.fillRect(px,py+7,T,1);ctx.fillRect(px,py+15,T,1);const off=(y&1)?4:12;ctx.fillRect(px+off,py,1,8);ctx.fillRect(px+((off+8)%16),py+8,1,8);
+  if(h%7===0){ctx.fillStyle='#a9a9a0';ctx.fillRect(px+3,py+2,3,2)}
+  return}
+ if(g==='≡'){
+  ctx.fillStyle='#6b4a2b';ctx.fillRect(px,py,T,T);
+  for(let r=0;r<3;r++){const ry=py+2+r*5;ctx.fillStyle='#4a3119';ctx.fillRect(px,ry+2,T,1);for(let i=0;i<4;i++){ctx.fillStyle=((h>>(i+r))&1)?'#e5bd69':'#6aa84a';ctx.fillRect(px+1+i*4,ry-1,2,3)}}
+  return}
+ if(g==='≈'){base(ctx,'water',x,y,px,py,frame,0);return}
+ if(g==='#'){base(ctx,'wall',x,y,px,py,frame,0);return}
+ base(ctx,'grass',x,y,px,py,frame,edges||0);
+ if(g==='♣')sprite(ctx,'tree',px,py);
+ else if(g==='▲')sprite(ctx,'rock',px,py);
+}
+const plotCache={};
+function plotArt(key,built,tier,w,h,doorCol){
+ const W=w*T,H=h*T,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),R=(col,a,b,cw,ch)=>{x.fillStyle=col;x.fillRect(a,b,cw,ch)};
+ if(!built){
+  R('#7a6a48',0,0,W,H);for(let k=0;k<W*H/40;k++){const a=(k*37)%W,b=(k*53)%H;R(k%2?'#6b5b3b':'#8a7a56',a,b,2,1)}
+  R('#4a3a22',0,0,W,2);R('#4a3a22',0,H-2,W,2);R('#4a3a22',0,0,2,H);R('#4a3a22',W-2,0,2,H);
+  for(const [a,b] of [[0,0],[W-4,0],[0,H-4],[W-4,H-4]])R('#9a6c3f',a,b,4,4);
+  for(let a=8;a<W-8;a+=8){R('#c9a227',a,1,3,1);R('#c9a227',a,H-2,3,1)}
+  R('#6b4a2b',doorCol*T+7,H-T+2,2,12);R('#e0b894',doorCol*T+3,H-T+2,10,5);R('#4a3a22',doorCol*T+5,H-T+4,6,1);
+  return c}
+ R('#3d6b3a',0,0,W,H);
+ if(key==='well'){
+  R('#9a9a90',0,0,W,H);R('#85857c',0,H/2,W,1);R('#85857c',W/2,0,1,H);
+  x.fillStyle='#6b7075';x.beginPath();x.arc(W/2,H/2,13,0,Math.PI*2);x.fill();x.fillStyle='#3a6f9c';x.beginPath();x.arc(W/2,H/2,9,0,Math.PI*2);x.fill();x.fillStyle='#7fb2d8';x.fillRect(W/2-4,H/2-4,4,1);x.fillRect(W/2+1,H/2+2,4,1);
+  R('#6b4a2b',3,H-5,2,5);R('#6b4a2b',W-5,H-5,2,5);R('#9a6c3f',W/2-2,3,4,2);return c}
+ if(key==='beacon'){
+  R('#9a9a90',0,0,W,H);R('#85857c',0,H-6,W,6);
+  R('#6b7075',W/2-14,H-18,28,14);R('#8c968e',W/2-14,H-18,28,3);R('#6b7075',W/2-9,H-34,18,16);R('#8c968e',W/2-9,H-34,18,3);R('#3b4540',W/2-10,H-38,20,4);
+  R('#14181a',W/2-3,H-14,6,10);
+  R('#e5bd69',W/2-5,H-46,10,10);R('#f3de8f',W/2-3,H-50,6,8);R('#ff9a3a',W/2-2,H-54,4,6);R('#fff2a8',W/2-1,H-48,2,4);
+  return c}
+ const HALL=['#9a6c3f','#5b6b8c','#c9a227'],look={hut:[HALL[Math.min(2,Math.max(0,tier-1))],'#e5bd69'],garden:['#d9b44a','#6aa84a'],well:['#6b7075','#7fb2d8'],huntingCamp:['#7a5a33','#c9a227'],...Object.fromEntries(Object.entries(HOUSES).map(([k,v])=>[k,v]))},[roof,accent]=look[key]||['#8a5a2b','#e5bd69'];
+ const roofH=(h-2)*T,wallY=roofH,wall=key==='mine'?'#6a6f73':key==='barracks'?'#a89a86':'#d8c8a0';
+ R(shade(roof,-.1),0,0,W,roofH);
+ for(let j=0;j<roofH;j+=4){R(shade(roof,-.28),0,j+3,W,1);for(let i=((j/4)&1)*4;i<W;i+=8)R(shade(roof,-.16),i,j,1,3)}
+ R(shade(roof,.28),0,0,W,2);R(shade(roof,-.4),0,roofH-2,W,2);R(shade(roof,-.18),0,0,2,roofH);R(shade(roof,-.18),W-2,0,2,roofH);
+ R(wall,0,wallY,W,H-wallY);R(shade(wall,-.2),0,wallY,W,2);R(shade(wall,-.3),0,H-2,W,2);R(shade(wall,-.12),0,0,0,0);
+ for(let i=0;i<w;i++){if(i===doorCol)continue;if(Math.abs(i-doorCol)%2===1){R('#3b4540',i*T+3,wallY+5,10,8);R('#7fb2d8',i*T+4,wallY+6,8,6);R('#3b4540',i*T+7,wallY+6,2,6);R('#3b4540',i*T+4,wallY+8,8,1)}}
+ const dx=doorCol*T;
+ if(key==='mine'){R('#14181a',dx+1,H-T-2,14,T+2);R('#3b4540',dx+1,H-T-2,14,2);R('#6b4a2b',dx+1,H-T,2,T);R('#6b4a2b',dx+13,H-T,2,T)}
+ else{R('#3d2a18',dx+2,H-T,12,T-1);R('#8a5a2b',dx+3,H-T+1,10,T-2);R('#6b4a2b',dx+7,H-T+1,2,T-2);R('#e5bd69',dx+10,H-T+8,2,2)}
+ R(accent,dx+1,H-T-3,14,3);R('#8c968e',dx+2,H-2,12,2);
+ if(key==='market'){for(let i=0;i<W;i+=4)R(i%8?'#ffffff':accent,i,wallY+2,4,3)}
+ if(key==='smithy'){R('#444b50',W-12,2,8,roofH-4);R('#2b3330',W-12,2,8,2);R('#ff7a2b',W-10,roofH-8,4,3)}
+ if(key==='barracks'){R('#6b4a2b',W/2-1,0,2,roofH-2);R('#df4a3a',W/2+1,1,10,6);R('#ffffff',W/2+3,3,3,2)}
+ if(key==='gemHall'){R('#f0a0ff',W/2-5,roofH/2-5,10,10);R('#ffffff',W/2-3,roofH/2-3,3,3);R('#8a5fb0',W/2-1,roofH/2+1,4,4)}
+ if(key==='lumberMill'){for(let i=0;i<3;i++)R(i%2?'#d9a066':'#9a6c3f',W-14,H-8-i*4,12,3)}
+ if(key==='tannery'){R('#e8c9a0',3,wallY-6,8,10);R('#c0803a',W-12,wallY-6,8,10)}
+ if(key==='fishingHut'){R('#9ad0f0',3,wallY-4,12,2);R('#7fb2d8',5,wallY-2,8,2);R('#e0b894',W-10,wallY-6,2,8)}
+ if(key==='huntersLodge'){R('#e0b894',W/2-5,roofH-10,10,4);R('#6b4a2b',W/2-6,roofH-12,2,6);R('#6b4a2b',W/2+4,roofH-12,2,6)}
+ if(key==='huntingCamp'){R('#8a5a2b',4,H-8,8,3);R('#df4a3a',W-9,wallY-8,5,6)}
+ if(key==='garden'){for(let i=2;i<W-2;i+=4)R(i%8?'#6aa84a':'#e5bd69',i,wallY-5,2,3)}
+ if(key==='hut'){
+  R(shade(roof,.15),W/2-9,2,18,5);
+  if(tier>=2){R('#cfd6dc',4,4,3,roofH-8);R('#df4a3a',7,4,7,5)}
+  if(tier>=3){R('#e5bd69',0,roofH-4,W,2);R('#cfd6dc',W-8,4,3,roofH-8);R('#3a6f9c',W-5,4,7,5);R('#f3de8f',W/2-2,0,4,4)}
+  R('#ffffff',W/2-6,wallY+4,12,2)}
+ return c}
+function townPlot(ctx,key,built,rx,ry,w,h,isDoor,px,py,tier,doorCol){
+ const id=key+'|'+(built?1:0)+'|'+tier+'|'+w+'x'+h;let art=plotCache[id];if(!art)art=plotCache[id]=plotArt(key,built,tier,w,h,doorCol);
+ ctx.drawImage(art,rx*T,ry*T,T,T,px,py,T,T)}
 const OV={'.':'#34603a','≈':'#2e5f86','♣':'#255a2c','▲':'#8c968e','%':'#b5483a','#':'#2b3330','?':'#c4a0dc','g':'#df4a3a','x':'#d9822b','C':'#8fc4b2','D':'#e58b72','K':'#ff5a4a','M':'#9a6c3f','⌂':'#e5bd69','S':'#e5bd69',c:'#d9822b',i:'#5a7fa8',s:'#ffffff',a:'#f3d44a','◆':'#c46bf0','<':'#e5bd69','>':'#e5bd69'};
-return {T,setSkin,workerKey,skinActive:()=>skinOn,base,sprite,shadow,bar,tint,portrait,icon,SPRITE_OF,overview:c=>OV[c]||'#34603a'};
+return {T,townTile,townPlot,setSkin,workerKey,skinActive:()=>skinOn,base,sprite,shadow,bar,tint,portrait,icon,SPRITE_OF,overview:c=>OV[c]||'#34603a'};
 })();
