@@ -187,7 +187,7 @@ test('battle can be driven from the keyboard', () => game(async page => {
 test('text map fits the narrowest allowed window', async () => {
   const ctx = await browser.newContext({ viewport: { width: 900, height: 700 } });
   const page = await ctx.newPage();
-  await page.goto(PAGE); await page.evaluate(() => { newWorld(); manualPause = true; render(); });
+  await page.goto(PAGE); await page.evaluate(() => { newWorld(); manualPause = true; useGfx = false; render(); });
   const overflow = await page.evaluate(() => { const m = document.getElementById('map'), w = m.parentElement; return w.scrollWidth - w.clientWidth; });
   await ctx.close();
   assert.ok(overflow <= 1, 'map wider than its panel by ' + overflow);
@@ -297,4 +297,33 @@ test('fast travel is gone', () => game(async page => {
 test('autosave shows a notice on the day timer', () => game(async page => {
   const t = await page.evaluate(() => { advanceDay(); return document.getElementById('toast').textContent; });
   assert.match(t, /Autosaved/);
+}));
+
+test('sprite map draws on a canvas and the toggle switches back to text', () => game(async page => {
+  const r = await page.evaluate(() => {
+    render();
+    const cv = document.getElementById('view'), ctx = cv.getContext('2d');
+    const cx = Math.floor(cv.width / 2), cy = Math.floor(cv.height / 2);
+    const px = ctx.getImageData(cx - 3, cy, 1, 1).data;       // the player's cloak sits at the centre of the view
+    const sprites = { canvas: cv.style.display, text: document.getElementById('map').style.display, player: Array.from(px).slice(0, 3) };
+    toggleGfx(); const text = { canvas: cv.style.display, text: document.getElementById('map').style.display };
+    toggleGfx(); return { sprites, text };
+  });
+  assert.equal(r.sprites.canvas, 'block'); assert.equal(r.sprites.text, 'none');
+  assert.equal(r.text.canvas, 'none'); assert.equal(r.text.text, '');
+}));
+
+test('every enemy has its own portrait in the battle window', () => game(async page => {
+  const r = await page.evaluate(() => {
+    const shots = {};
+    for (const e of Object.values(enemyCatalog)) {
+      state.x = HOME.x + 12; state.y = HOME.y; const x = state.x + 1, y = state.y;
+      overworld[y][x] = 'g'; enemyBucket(overworld).set(x + ',' + y, { ...e });
+      startCombat(x, y, state.x, state.y); shots[e.name] = document.querySelector('#dialog img.portrait')?.src || null;
+      state.combat = null; closeDialog();
+    }
+    return shots;
+  });
+  const values = Object.values(r);
+  assert.ok(values.every(Boolean)); assert.equal(new Set(values).size, values.length);
 }));
