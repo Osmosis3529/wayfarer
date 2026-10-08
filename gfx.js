@@ -68,14 +68,14 @@ for(const [k,pat] of Object.entries(P))if(!['house','ore'].includes(k))cache[k]=
 for(const [k,[roof,em]] of Object.entries(HOUSES))cache['b_'+k]=build(P.house,{X:roof,E:em});
 for(const [g,col] of Object.entries(ORES))cache['ore_'+g]=build(P.ore,{X:col});
 function enemySprite(name){const look=ENEMY_LOOK[name]||['beast','#8c968e','#4a524d','#ff4a3a'];return build(ENEMY_ART[look[0]],{X:look[1],x:look[2],E:look[3]})}
-function portrait(name){if(!portraits[name]){const s=skinOn&&SKIN_PORTRAITS[name]!=null?cut(skinSheets.dungeon,SKIN_PORTRAITS[name]):enemySprite(name),c=document.createElement('canvas');c.width=c.height=96;const x=c.getContext('2d');x.imageSmoothingEnabled=false;x.fillStyle='#111a14';x.fillRect(0,0,96,96);x.drawImage(s,8,8,80,80);portraits[name]=c.toDataURL()}return portraits[name]}
+function portrait(name){if(!portraits[name]){const sp=skinOn&&SKIN_PORTRAITS[name],s=sp?cut(skinSheets[sp[0]],sp[1],sp[2]):enemySprite(name),c=document.createElement('canvas');c.width=c.height=96;const x=c.getContext('2d');x.imageSmoothingEnabled=false;x.fillStyle='#111a14';x.fillRect(0,0,96,96);x.drawImage(s,8,8,80,80);portraits[name]=c.toDataURL()}return portraits[name]}
 cache.tree_spent=build(P.treeSpent);cache.rock_spent=build(P.rockSpent);cache.berry_spent=build(P.berry,{r:'#4f8f3c'});cache.ore_spent=build(P.ore,{X:'#3b4540'});
 cache.b_garden=cache.farm;cache.b_well=cache.well;cache.b_huntingCamp=cache.camp;cache.b_beacon=cache.beacon;
 const SPRITE_OF={'♣':'tree','▲':'rock','%':'berry','?':'chest','g':'enemy','x':'fox','C':'cave','D':'dungeon','K':'keep','M':'mine','S':'town','⌂':'home','<':'stairL','>':'stairR',c:'ore_c',i:'ore_i',s:'ore_s',a:'ore_a','◆':'ore_◆'};
 function hash(x,y){return (Math.imul(x,73856093)^Math.imul(y,19349663))>>>0}
 function base(ctx,kind,x,y,px,py,frame,edges){
  const h=hash(x,y);
- if(skinOn&&kind!=='water'){const set=skinBase[kind];if(set){ctx.drawImage(set[(h>>>3)%set.length],px,py);if(edges&&kind==='grass'){ctx.fillStyle='#b8a878';if(edges&1)ctx.fillRect(px,py,T,2);if(edges&2)ctx.fillRect(px,py+T-2,T,2);if(edges&4)ctx.fillRect(px,py,2,T);if(edges&8)ctx.fillRect(px+T-2,py,2,T)}return}}
+ if(skinOn){const set=skinBase[kind];if(set){ctx.drawImage(kind==='water'?set[frame%2]:set[(h>>>3)%set.length],px,py);if(kind==='floor'||kind==='wall'){ctx.fillStyle=kind==='floor'?'rgba(8,14,12,.58)':'rgba(8,14,12,.35)';ctx.fillRect(px,py,T,T)}if(edges&&kind==='grass'){ctx.fillStyle='#b8a878';if(edges&1)ctx.fillRect(px,py,T,2);if(edges&2)ctx.fillRect(px,py+T-2,T,2);if(edges&4)ctx.fillRect(px,py,2,T);if(edges&8)ctx.fillRect(px+T-2,py,2,T)}return}}
  if(kind==='water'){ctx.fillStyle='#2e5f86';ctx.fillRect(px,py,T,T);ctx.fillStyle='#4f8db8';const o=((h&3)+frame*2)%T;ctx.fillRect(px+(o%12),py+4+(h>>2&3),4,1);ctx.fillRect(px+((o+7)%12),py+11,3,1);return}
  if(kind==='wall'){ctx.fillStyle='#1c2220';ctx.fillRect(px,py,T,T);ctx.fillStyle='#3b4540';ctx.fillRect(px,py+1,T,6);ctx.fillRect(px,py+9,T,6);ctx.fillStyle='#2b3330';const off=(y&1)*4;ctx.fillRect(px+off+3,py+1,1,6);ctx.fillRect(px+off+11,py+1,1,6);ctx.fillRect(px+(4-off)+3,py+9,1,6);ctx.fillRect(px+(4-off)+11,py+9,1,6);return}
  const floor=kind==='floor';ctx.fillStyle=floor?'#262c29':'#3d6b3a';ctx.fillRect(px,py,T,T);
@@ -85,22 +85,28 @@ function base(ctx,kind,x,y,px,py,frame,edges){
 function sprite(ctx,key,px,py,alpha,flip){const s=cache[key];if(!s)return;ctx.save();if(alpha!=null&&alpha<1)ctx.globalAlpha=alpha;if(flip){ctx.translate(px+T,py);ctx.scale(-1,1);ctx.drawImage(s,0,0)}else ctx.drawImage(s,px,py);ctx.restore()}
 function bar(ctx,px,py,frac){ctx.fillStyle='#14181a';ctx.fillRect(px+1,py,T-2,3);ctx.fillStyle=frac>.5?'#7fbf5a':frac>.25?'#e5bd69':'#df4a3a';ctx.fillRect(px+2,py+1,Math.max(1,Math.round((T-4)*frac)),1)}
 function tint(ctx,w,h,a){if(a<=0)return;ctx.fillStyle='rgba(10,20,60,'+a.toFixed(3)+')';ctx.fillRect(0,0,w,h)}
-// ---- Optional art skin: Kenney's CC0 Tiny Town + Tiny Dungeon (16px tiles, 1px spacing, 12 per row) ----
-const SKIN_TILES={tree:['town',16],tree_spent:['town',17],rock:['town',43],rock_spent:['town',1],berry:['town',29],berry_spent:['town',5],chest:['dungeon',89],enemy:['dungeon',110],fox:['dungeon',123],player:['dungeon',85],worker:['dungeon',86],soldier:['dungeon',97],home:['town',67],town:['town',86],cave:['dungeon',10],dungeon:['dungeon',19],keep:['dungeon',29],mine:['dungeon',56],stairL:['dungeon',43],stairR:['dungeon',44],ore_spent:['dungeon',12],
- b_market:['town',57],b_garden:['town',17],b_well:['town',104],b_smithy:['town',128],b_huntersLodge:['town',118],b_gemHall:['town',95],b_lumberMill:['town',127],b_mine:['town',115],b_tannery:['town',106],b_fishingHut:['town',130],b_huntingCamp:['town',92],b_barracks:['town',63],b_beacon:['town',94]};
+// ---- Optional art skin: Kenney's CC0 Roguelike/RPG Pack + Roguelike Characters (16px tiles, 1px spacing) ----
+// Entries are [sheet, column, row]. Anything not listed keeps the handmade art.
+const SKIN_TILES={tree:['rpg',13,9],tree_spent:['rpg',22,10],rock:['rpg',54,21],rock_spent:['rpg',56,22],berry:['rpg',24,9],berry_spent:['rpg',19,9],chest:['rpg',37,9],enemy:['chars',0,3],player:['chars',0,7],worker:['chars',0,5],soldier:['chars',0,11],
+ home:['rpg',32,0],town:['rpg',33,0],cave:['rpg',40,8],dungeon:['rpg',42,9],keep:['rpg',44,9],mine:['rpg',36,1],stairL:['rpg',50,25],stairR:['rpg',51,25],ore_spent:['rpg',54,20],
+ b_market:['rpg',10,0],b_garden:['rpg',22,11],b_well:['rpg',24,0],b_smithy:['rpg',15,0],b_huntersLodge:['rpg',48,10],b_gemHall:['rpg',43,11],b_lumberMill:['rpg',53,21],b_mine:['rpg',49,21],b_tannery:['rpg',51,12],b_fishingHut:['rpg',53,18],b_huntingCamp:['rpg',46,10],b_barracks:['rpg',50,0],b_beacon:['rpg',18,8]};
+const SKIN_WORKERS=[[0,5],[1,5],[0,6],[1,6],[0,7],[1,7],[0,9],[1,9]];
 const SKIN_ORES={c:'#d9822b',i:'#7fb2d8',s:'#ffffff',a:'#f3d44a','◆':'#c46bf0'};
-const SKIN_PORTRAITS={'Briar Wolf':124,'Thornback Boar':123,'Roadside Bandit':88,'Thorn Stalker':123,'Dire Wolf':124,'Moss Troll':109,'Tunnel Rat':123,'Kobold Delver':112,'Cave Spider':122,'Crystal Guardian':108,'Deep Horror':110,'Buried Wyrm':120,'Restless Skeleton':121,'Grave Cultist':111,'Barrow Ghoul':108,'Hollow Wraith':121,'Crypt Ogre':109,'Forgotten Warden':97,'The Hollow King':87};
+const SKIN_PORTRAITS={'Roadside Bandit':['chars',0,8],'Kobold Delver':['chars',1,3],'Grave Cultist':['chars',1,10],'Moss Troll':['chars',0,3],'Crypt Ogre':['chars',1,8],'Forgotten Warden':['chars',0,11],'The Hollow King':['chars',1,10],'Restless Skeleton':['chars',1,11],'Barrow Ghoul':['chars',1,3]};
 let skinSheets=null;
-function cut(sheet,idx){const c=document.createElement('canvas');c.width=c.height=T;c.getContext('2d').drawImage(sheet,(idx%12)*17,Math.floor(idx/12)*17,16,16,0,0,T,T);return c}
-function loadImage(src){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('missing '+src));i.src=src})}
+function cut(sheet,col,row){const c=document.createElement('canvas');c.width=c.height=T;c.getContext('2d').drawImage(sheet,col*17,row*17,16,16,0,0,T,T);return c}
+function loadImage(src){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('image failed to load'));i.src=src})}
+function workerKey(id){if(!skinOn||id==null)return 'worker';let h=0;for(const ch of String(id))h=(h*31+ch.charCodeAt(0))>>>0;return 'worker'+(h%SKIN_WORKERS.length)}
 async function setSkin(name){
  if(!name){skinOn=false;for(const k of Object.keys(procedural))cache[k]=procedural[k];for(const k of Object.keys(portraits))delete portraits[k];return true}
- if(!skinSheets){const [town,dungeon]=await Promise.all([loadImage(KENNEY_DATA.town),loadImage(KENNEY_DATA.dungeon)]);skinSheets={town,dungeon}}
- for(const [k,[sh,i]] of Object.entries(SKIN_TILES)){if(!(k in procedural))procedural[k]=cache[k];cache[k]=cut(skinSheets[sh],i)}
- for(const [g,col] of Object.entries(SKIN_ORES)){const key='ore_'+g;if(!(key in procedural))procedural[key]=cache[key];const c=cut(skinSheets.dungeon,24),x=c.getContext('2d');x.fillStyle=col;for(const [a,b] of [[3,3],[10,5],[6,10],[11,11]])x.fillRect(a,b,2,2);cache[key]=c}
- skinBase.grass=[0,0,0,0,1,0,0,2].map(i=>cut(skinSheets.town,i));skinBase.floor=[48,48,49,48,50].map(i=>cut(skinSheets.dungeon,i));skinBase.wall=[cut(skinSheets.dungeon,14)];
+ if(!skinSheets){const [rpg,chars]=await Promise.all([loadImage(KENNEY_DATA.rpg),loadImage(KENNEY_DATA.chars)]);skinSheets={rpg,chars}}
+ const put=(k,c)=>{if(!(k in procedural))procedural[k]=cache[k];cache[k]=c};
+ for(const [k,[sh,c,r]] of Object.entries(SKIN_TILES))put(k,cut(skinSheets[sh],c,r));
+ SKIN_WORKERS.forEach(([c,r],i)=>put('worker'+i,cut(skinSheets.chars,c,r)));
+ for(const [g,col] of Object.entries(SKIN_ORES)){const c=cut(skinSheets.rpg,55,21),x=c.getContext('2d');x.fillStyle=col;for(const [a,b] of [[4,5],[9,4],[6,9],[10,10]])x.fillRect(a,b,2,2);put('ore_'+g,c)}
+ skinBase.grass=[[5,0],[5,1],[5,0],[5,1],[5,0]].map(([c,r])=>cut(skinSheets.rpg,c,r));skinBase.floor=[[7,0],[7,1],[7,0]].map(([c,r])=>cut(skinSheets.rpg,c,r));skinBase.wall=[[6,2],[6,3]].map(([c,r])=>cut(skinSheets.rpg,c,r));skinBase.water=[[0,0],[1,0]].map(([c,r])=>cut(skinSheets.rpg,c,r));
  for(const k of Object.keys(portraits))delete portraits[k];
  skinOn=true;return true}
 const OV={'.':'#34603a','≈':'#2e5f86','♣':'#255a2c','▲':'#8c968e','%':'#b5483a','#':'#2b3330','?':'#c4a0dc','g':'#df4a3a','x':'#d9822b','C':'#8fc4b2','D':'#e58b72','K':'#ff5a4a','M':'#9a6c3f','⌂':'#e5bd69','S':'#e5bd69',c:'#d9822b',i:'#5a7fa8',s:'#ffffff',a:'#f3d44a','◆':'#c46bf0','<':'#e5bd69','>':'#e5bd69'};
-return {T,setSkin,skinActive:()=>skinOn,base,sprite,bar,tint,portrait,icon,SPRITE_OF,overview:c=>OV[c]||'#34603a'};
+return {T,setSkin,workerKey,skinActive:()=>skinOn,base,sprite,bar,tint,portrait,icon,SPRITE_OF,overview:c=>OV[c]||'#34603a'};
 })();

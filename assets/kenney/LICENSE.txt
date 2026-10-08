@@ -1,6 +1,10 @@
-Tiny Town (1.1) and Tiny Dungeon (1.0) by Kenney (www.kenney.nl)
-https://kenney.nl/assets/tiny-town
-https://kenney.nl/assets/tiny-dungeon
+Roguelike/RPG Pack by Kenney Vleugels for Kenney (www.kenney.nl), with help by Lynn Evers
+  https://kenney.nl/assets/roguelike-rpg-pack
+Roguelike Characters (2.0) by Kenney (www.kenney.nl)
+  https://kenney.nl/assets/roguelike-characters
 
 License: Creative Commons Zero (CC0) - http://creativecommons.org/publicdomain/zero/1.0/
 You may use these assets in personal and commercial projects. Credit is appreciated but not required.
+
+The PNG sheets (16px tiles, 1px spacing) are also embedded in kenney-data.js so that the game's canvas
+is not tainted when it runs from file://.
