@@ -164,7 +164,7 @@ test('building buttons show the real costs and building deducts them', () => gam
 test('every town and site can be reached from home', () => game(async page => {
   const r = await page.evaluate(() => {
     const k = mines[0];
-    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === 2) overworld[k.y + dy][k.x + dx] = '≈';
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === 2 && !'SCDKM⌂'.includes(overworld[k.y + dy][k.x + dx])) overworld[k.y + dy][k.x + dx] = '≈';
     const walledOff = !reachableFromHome()[k.y][k.x];
     ensureReachable();
     const seen = reachableFromHome();
