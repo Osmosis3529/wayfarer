@@ -362,3 +362,13 @@ test('inventory shows an icon for every item and spent patches get their own spr
   assert.equal(r.count, r.items); assert.ok(r.distinct >= r.items - 1);
   assert.notEqual(r.fresh, r.spent);
 }));
+
+test('Kenney art skin loads, draws, and can be switched back', () => game(async page => {
+  const r = await page.evaluate(async () => {
+    toggleSkin(); await new Promise(r => setTimeout(r, 500));
+    const on = GFX.skinActive(); render(); const canvasOk = document.getElementById('view').width > 0;
+    toggleSkin(); await new Promise(r => setTimeout(r, 300));
+    return { on, off: !GFX.skinActive(), canvasOk, label: document.getElementById('skin-btn').textContent };
+  });
+  assert.deepEqual(r, { on: true, off: true, canvasOk: true, label: 'Art: handmade' });
+}));

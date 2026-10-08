@@ -25,6 +25,7 @@
       "main.js",
       "wayfarer.html",
       "gfx.js",
+      "assets/**/*",
       "icon.ico",
       "package.json"
     ],

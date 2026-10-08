@@ -62,18 +62,20 @@ const iconCache={};
 function icon(key){if(!ICONS[key])return '';if(!iconCache[key]){const s=build(ICONS[key].p,ICONS[key].o),c=document.createElement('canvas');c.width=c.height=24;const x=c.getContext('2d');x.imageSmoothingEnabled=false;x.drawImage(s,0,0,24,24);iconCache[key]=c.toDataURL()}return iconCache[key]}
 const cache={};
 const portraits={};
+let skinOn=false;const skinBase={},procedural={};
 function build(pat,over){const c=document.createElement('canvas');c.width=c.height=T;const x=c.getContext('2d');pat.forEach((row,j)=>{for(let i=0;i<8;i++){const ch=row[i];if(ch==='.')continue;const col=(over&&over[ch])||PAL[ch];if(!col)continue;x.fillStyle=col;x.fillRect(i*2,j*2,2,2)}});return c}
 for(const [k,pat] of Object.entries(P))if(!['house','ore'].includes(k))cache[k]=build(pat);
 for(const [k,[roof,em]] of Object.entries(HOUSES))cache['b_'+k]=build(P.house,{X:roof,E:em});
 for(const [g,col] of Object.entries(ORES))cache['ore_'+g]=build(P.ore,{X:col});
 function enemySprite(name){const look=ENEMY_LOOK[name]||['beast','#8c968e','#4a524d','#ff4a3a'];return build(ENEMY_ART[look[0]],{X:look[1],x:look[2],E:look[3]})}
-function portrait(name){if(!portraits[name]){const s=enemySprite(name),c=document.createElement('canvas');c.width=c.height=96;const x=c.getContext('2d');x.imageSmoothingEnabled=false;x.fillStyle='#111a14';x.fillRect(0,0,96,96);x.drawImage(s,8,8,80,80);portraits[name]=c.toDataURL()}return portraits[name]}
+function portrait(name){if(!portraits[name]){const s=skinOn&&SKIN_PORTRAITS[name]!=null?cut(skinSheets.dungeon,SKIN_PORTRAITS[name]):enemySprite(name),c=document.createElement('canvas');c.width=c.height=96;const x=c.getContext('2d');x.imageSmoothingEnabled=false;x.fillStyle='#111a14';x.fillRect(0,0,96,96);x.drawImage(s,8,8,80,80);portraits[name]=c.toDataURL()}return portraits[name]}
 cache.tree_spent=build(P.treeSpent);cache.rock_spent=build(P.rockSpent);cache.berry_spent=build(P.berry,{r:'#4f8f3c'});cache.ore_spent=build(P.ore,{X:'#3b4540'});
 cache.b_garden=cache.farm;cache.b_well=cache.well;cache.b_huntingCamp=cache.camp;cache.b_beacon=cache.beacon;
 const SPRITE_OF={'♣':'tree','▲':'rock','%':'berry','?':'chest','g':'enemy','x':'fox','C':'cave','D':'dungeon','K':'keep','M':'mine','S':'town','⌂':'home','<':'stairL','>':'stairR',c:'ore_c',i:'ore_i',s:'ore_s',a:'ore_a','◆':'ore_◆'};
 function hash(x,y){return (Math.imul(x,73856093)^Math.imul(y,19349663))>>>0}
 function base(ctx,kind,x,y,px,py,frame,edges){
  const h=hash(x,y);
+ if(skinOn&&kind!=='water'){const set=skinBase[kind];if(set){ctx.drawImage(set[(h>>>3)%set.length],px,py);if(edges&&kind==='grass'){ctx.fillStyle='#b8a878';if(edges&1)ctx.fillRect(px,py,T,2);if(edges&2)ctx.fillRect(px,py+T-2,T,2);if(edges&4)ctx.fillRect(px,py,2,T);if(edges&8)ctx.fillRect(px+T-2,py,2,T)}return}}
  if(kind==='water'){ctx.fillStyle='#2e5f86';ctx.fillRect(px,py,T,T);ctx.fillStyle='#4f8db8';const o=((h&3)+frame*2)%T;ctx.fillRect(px+(o%12),py+4+(h>>2&3),4,1);ctx.fillRect(px+((o+7)%12),py+11,3,1);return}
  if(kind==='wall'){ctx.fillStyle='#1c2220';ctx.fillRect(px,py,T,T);ctx.fillStyle='#3b4540';ctx.fillRect(px,py+1,T,6);ctx.fillRect(px,py+9,T,6);ctx.fillStyle='#2b3330';const off=(y&1)*4;ctx.fillRect(px+off+3,py+1,1,6);ctx.fillRect(px+off+11,py+1,1,6);ctx.fillRect(px+(4-off)+3,py+9,1,6);ctx.fillRect(px+(4-off)+11,py+9,1,6);return}
  const floor=kind==='floor';ctx.fillStyle=floor?'#262c29':'#3d6b3a';ctx.fillRect(px,py,T,T);
@@ -83,6 +85,22 @@ function base(ctx,kind,x,y,px,py,frame,edges){
 function sprite(ctx,key,px,py,alpha,flip){const s=cache[key];if(!s)return;ctx.save();if(alpha!=null&&alpha<1)ctx.globalAlpha=alpha;if(flip){ctx.translate(px+T,py);ctx.scale(-1,1);ctx.drawImage(s,0,0)}else ctx.drawImage(s,px,py);ctx.restore()}
 function bar(ctx,px,py,frac){ctx.fillStyle='#14181a';ctx.fillRect(px+1,py,T-2,3);ctx.fillStyle=frac>.5?'#7fbf5a':frac>.25?'#e5bd69':'#df4a3a';ctx.fillRect(px+2,py+1,Math.max(1,Math.round((T-4)*frac)),1)}
 function tint(ctx,w,h,a){if(a<=0)return;ctx.fillStyle='rgba(10,20,60,'+a.toFixed(3)+')';ctx.fillRect(0,0,w,h)}
+// ---- Optional art skin: Kenney's CC0 Tiny Town + Tiny Dungeon (16px tiles, 1px spacing, 12 per row) ----
+const SKIN_TILES={tree:['town',16],tree_spent:['town',17],rock:['town',43],rock_spent:['town',1],berry:['town',29],berry_spent:['town',5],chest:['dungeon',89],enemy:['dungeon',110],fox:['dungeon',123],player:['dungeon',85],worker:['dungeon',86],soldier:['dungeon',97],home:['town',67],town:['town',86],cave:['dungeon',10],dungeon:['dungeon',19],keep:['dungeon',29],mine:['dungeon',56],stairL:['dungeon',43],stairR:['dungeon',44],ore_spent:['dungeon',12],
+ b_market:['town',57],b_garden:['town',17],b_well:['town',104],b_smithy:['town',128],b_huntersLodge:['town',118],b_gemHall:['town',95],b_lumberMill:['town',127],b_mine:['town',115],b_tannery:['town',106],b_fishingHut:['town',130],b_huntingCamp:['town',92],b_barracks:['town',63],b_beacon:['town',94]};
+const SKIN_ORES={c:'#d9822b',i:'#7fb2d8',s:'#ffffff',a:'#f3d44a','◆':'#c46bf0'};
+const SKIN_PORTRAITS={'Briar Wolf':124,'Thornback Boar':123,'Roadside Bandit':88,'Thorn Stalker':123,'Dire Wolf':124,'Moss Troll':109,'Tunnel Rat':123,'Kobold Delver':112,'Cave Spider':122,'Crystal Guardian':108,'Deep Horror':110,'Buried Wyrm':120,'Restless Skeleton':121,'Grave Cultist':111,'Barrow Ghoul':108,'Hollow Wraith':121,'Crypt Ogre':109,'Forgotten Warden':97,'The Hollow King':87};
+let skinSheets=null;
+function cut(sheet,idx){const c=document.createElement('canvas');c.width=c.height=T;c.getContext('2d').drawImage(sheet,(idx%12)*17,Math.floor(idx/12)*17,16,16,0,0,T,T);return c}
+function loadImage(src){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('missing '+src));i.src=src})}
+async function setSkin(name){
+ if(!name){skinOn=false;for(const k of Object.keys(procedural))cache[k]=procedural[k];for(const k of Object.keys(portraits))delete portraits[k];return true}
+ if(!skinSheets){const [town,dungeon]=await Promise.all([loadImage(KENNEY_DATA.town),loadImage(KENNEY_DATA.dungeon)]);skinSheets={town,dungeon}}
+ for(const [k,[sh,i]] of Object.entries(SKIN_TILES)){if(!(k in procedural))procedural[k]=cache[k];cache[k]=cut(skinSheets[sh],i)}
+ for(const [g,col] of Object.entries(SKIN_ORES)){const key='ore_'+g;if(!(key in procedural))procedural[key]=cache[key];const c=cut(skinSheets.dungeon,24),x=c.getContext('2d');x.fillStyle=col;for(const [a,b] of [[3,3],[10,5],[6,10],[11,11]])x.fillRect(a,b,2,2);cache[key]=c}
+ skinBase.grass=[0,0,0,0,1,0,0,2].map(i=>cut(skinSheets.town,i));skinBase.floor=[48,48,49,48,50].map(i=>cut(skinSheets.dungeon,i));skinBase.wall=[cut(skinSheets.dungeon,14)];
+ for(const k of Object.keys(portraits))delete portraits[k];
+ skinOn=true;return true}
 const OV={'.':'#34603a','≈':'#2e5f86','♣':'#255a2c','▲':'#8c968e','%':'#b5483a','#':'#2b3330','?':'#c4a0dc','g':'#df4a3a','x':'#d9822b','C':'#8fc4b2','D':'#e58b72','K':'#ff5a4a','M':'#9a6c3f','⌂':'#e5bd69','S':'#e5bd69',c:'#d9822b',i:'#5a7fa8',s:'#ffffff',a:'#f3d44a','◆':'#c46bf0','<':'#e5bd69','>':'#e5bd69'};
-return {T,base,sprite,bar,tint,portrait,icon,SPRITE_OF,overview:c=>OV[c]||'#34603a'};
+return {T,setSkin,skinActive:()=>skinOn,base,sprite,bar,tint,portrait,icon,SPRITE_OF,overview:c=>OV[c]||'#34603a'};
 })();
