@@ -373,3 +373,18 @@ test('Kenney art skin loads, draws, and can be switched back', () => game(async 
   });
   assert.deepEqual(r, { on: true, off: true, canvasOk: true, label: 'Art: handmade' });
 }));
+
+test('characters face the way they step and animate only while walking', () => game(async page => {
+  const r = await page.evaluate(() => {
+    state.x = HOME.x + 20; state.y = HOME.y; for (let dx = -2; dx <= 2; dx++) overworld[state.y][state.x + dx] = '.';
+    const idle = poseOf('player', performance.now(), 0);
+    move(-1, 0); const left = animState.get('player'), walkingNow = poseOf('player', performance.now(), 0);
+    const later = poseOf('player', performance.now() + 2000, 0);
+    state.inv.wood = 50; state.inv.stone = 50; build('lumberMill'); const w = state.workers[0];
+    w.x = HOME.x + 8; w.y = HOME.y + 8; for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) overworld[w.y + dy][w.x + dx] = '.';
+    noteStep(w.id, 1); const east = animState.get(w.id).fx; noteStep(w.id, -1); const west = animState.get(w.id).fx;
+    render();
+    return { idleWalking: idle.walking, facing: left.fx, walking: walkingNow.walking, lean: walkingNow.lean !== 0, later: later.walking, east, west, drawn: animating() };
+  });
+  assert.deepEqual(r, { idleWalking: false, facing: -1, walking: true, lean: true, later: false, east: 1, west: -1, drawn: true });
+}));

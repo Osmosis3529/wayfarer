@@ -82,7 +82,8 @@ function base(ctx,kind,x,y,px,py,frame,edges){
  for(let k=0;k<3;k++){const sx=(h>>(k*5))&15,sy=(h>>(k*5+3))&15;ctx.fillStyle=k===0?(floor?'#2f3733':'#4a7c44'):(floor?'#1f2522':'#34602f');ctx.fillRect(px+sx,py+sy,1+(k===0?1:0),1)}
  if(edges&&!floor){ctx.fillStyle='#b8a878';if(edges&1)ctx.fillRect(px,py,T,2);if(edges&2)ctx.fillRect(px,py+T-2,T,2);if(edges&4)ctx.fillRect(px,py,2,T);if(edges&8)ctx.fillRect(px+T-2,py,2,T)}
 }
-function sprite(ctx,key,px,py,alpha,flip){const s=cache[key];if(!s)return;ctx.save();if(alpha!=null&&alpha<1)ctx.globalAlpha=alpha;if(flip){ctx.translate(px+T,py);ctx.scale(-1,1);ctx.drawImage(s,0,0)}else ctx.drawImage(s,px,py);ctx.restore()}
+function sprite(ctx,key,px,py,alpha,flip,pose){const s=cache[key];if(!s)return;ctx.save();if(alpha!=null&&alpha<1)ctx.globalAlpha=alpha;ctx.translate(px+T/2,py+T+(pose&&pose.dy||0));if(pose&&pose.lean)ctx.rotate(pose.lean);if(flip)ctx.scale(-1,1);ctx.drawImage(s,-T/2,-T);ctx.restore()}
+function shadow(ctx,px,py){ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(px+T/2,py+T-1.5,5,2,0,0,Math.PI*2);ctx.fill()}
 function bar(ctx,px,py,frac){ctx.fillStyle='#14181a';ctx.fillRect(px+1,py,T-2,3);ctx.fillStyle=frac>.5?'#7fbf5a':frac>.25?'#e5bd69':'#df4a3a';ctx.fillRect(px+2,py+1,Math.max(1,Math.round((T-4)*frac)),1)}
 function tint(ctx,w,h,a){if(a<=0)return;ctx.fillStyle='rgba(10,20,60,'+a.toFixed(3)+')';ctx.fillRect(0,0,w,h)}
 // ---- Optional art skin: Kenney's CC0 Roguelike/RPG Pack + Roguelike Characters (16px tiles, 1px spacing) ----
@@ -108,5 +109,5 @@ async function setSkin(name){
  for(const k of Object.keys(portraits))delete portraits[k];
  skinOn=true;return true}
 const OV={'.':'#34603a','≈':'#2e5f86','♣':'#255a2c','▲':'#8c968e','%':'#b5483a','#':'#2b3330','?':'#c4a0dc','g':'#df4a3a','x':'#d9822b','C':'#8fc4b2','D':'#e58b72','K':'#ff5a4a','M':'#9a6c3f','⌂':'#e5bd69','S':'#e5bd69',c:'#d9822b',i:'#5a7fa8',s:'#ffffff',a:'#f3d44a','◆':'#c46bf0','<':'#e5bd69','>':'#e5bd69'};
-return {T,setSkin,workerKey,skinActive:()=>skinOn,base,sprite,bar,tint,portrait,icon,SPRITE_OF,overview:c=>OV[c]||'#34603a'};
+return {T,setSkin,workerKey,skinActive:()=>skinOn,base,sprite,shadow,bar,tint,portrait,icon,SPRITE_OF,overview:c=>OV[c]||'#34603a'};
 })();
