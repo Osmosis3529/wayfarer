@@ -24,7 +24,7 @@ async function game(fn) {
 }
 
 test('fox fur unlocks the hunters lodge', () => game(async page => {
-  const unlocked = await page.evaluate(() => { state.x = HOME.x + 12; state.y = HOME.y; map[state.y][state.x + 1] = 'x'; interact(); return state.unlocked.huntersLodge; });
+  const unlocked = await page.evaluate(() => { state.x = HOME.x + 12; state.y = HOME.y; for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) map[state.y + dy][state.x + dx] = '.'; map[state.y][state.x + 1] = 'x'; interact(); return state.unlocked.huntersLodge; });
   assert.equal(unlocked, true);
 }));
 
@@ -334,6 +334,7 @@ test('battle hotkeys work when a fight starts on its own in real time', async ()
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto(PAGE); await page.evaluate(() => {
     newWorld(); state.x = HOME.x + 12; state.y = HOME.y;
+    for (let dx = -1; dx <= 5; dx++) for (let dy = -1; dy <= 1; dy++) overworld[state.y + dy][state.x + dx] = '.';
     const x = state.x + 3, y = state.y; overworld[y][x] = 'g';
     enemyBucket(overworld).set(x + ',' + y, { ...enemyCatalog.boar, level: 6, maxHp: 60, curHp: 60 });
   });
