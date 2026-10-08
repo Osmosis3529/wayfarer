@@ -192,3 +192,14 @@ test('text map fits the narrowest allowed window', async () => {
   await ctx.close();
   assert.ok(overflow <= 1, 'map wider than its panel by ' + overflow);
 });
+
+test('berries can be eaten underground', () => game(async page => {
+  const r = await page.evaluate(() => {
+    const k = mines[0]; state.x = k.x; state.y = k.y; enterInstance(k, 'mine');
+    state.inv.berries = 2; state.hp = 1; state.maxHp = 10; render();
+    const button = [...document.querySelectorAll('#actions button')].find(b => b.textContent.includes('Eat berries'));
+    button.click();
+    return { hasButton: !!button, hp: state.hp, berries: state.inv.berries };
+  });
+  assert.deepEqual(r, { hasButton: true, hp: 4, berries: 1 });
+}));
