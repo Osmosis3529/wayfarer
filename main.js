@@ -17,6 +17,8 @@ function createWindow() {
       sandbox: true
     }
   });
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.on('will-navigate', e => e.preventDefault());
   win.loadFile(path.join(__dirname, 'wayfarer.html'));
 }
 
