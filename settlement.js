@@ -49,17 +49,22 @@ function buildTownMap() {
   return g;
 }
 let townMap = null;
-function getTownMap() { return townMap || (townMap = buildTownMap()); }
+function brackenfordMap() { return townMap || (townMap = buildTownMap()); }
+// Brackenford's own map, or the interior of the settlement you are visiting (towns.js).
+function getTownMap() { return state.visiting ? npcMap().grid : brackenfordMap(); }
+function townPlots() { return state.visiting ? npcMap().plots : TOWN_PLOTS; }
+function townW() { return getTownMap()[0].length; }
+function townH() { return getTownMap().length; }
 function townWalkable(g) { return g === '.' || g === '▒' || g === '▓' || g === '≡'; }
-function plotAtDoor(x, y) { for (const [k, p] of Object.entries(TOWN_PLOTS)) if (p.door[0] === x && p.door[1] === y) return k; return null; }
-function plotContaining(x, y) { for (const [k, p] of Object.entries(TOWN_PLOTS)) if (x >= p.x0 && x <= p.x1 && y >= p.y0 && y <= p.y1) return k; return null; }
+function plotAtDoor(x, y) { for (const [k, p] of Object.entries(townPlots())) if (p.door[0] === x && p.door[1] === y) return k; return null; }
+function plotContaining(x, y) { for (const [k, p] of Object.entries(townPlots())) if (x >= p.x0 && x <= p.x1 && y >= p.y0 && y <= p.y1) return k; return null; }
 
 // Breadth-first path between two tiles (4-directional), cached.
 const townPathCache = new Map();
 function townPath(from, to) {
   const key = from + '>' + to;
   if (townPathCache.has(key)) return townPathCache.get(key).slice();
-  const m = getTownMap(), prev = new Map(), q = [from], id = (x, y) => y * TOWN_W + x;
+  const m = getTownMap(), prev = new Map(), q = [from], id = (x, y) => y * m[0].length + x;
   prev.set(id(from[0], from[1]), null);
   let found = false;
   for (let h = 0; h < q.length && !found; h++) {
@@ -251,6 +256,7 @@ function retarget(p, job) { p.job = job; p.targets = targetsFor(job, p.idx); p.t
 // Keeps every citizen where they are; only people whose job changed get new routes.
 function syncTownPeople() {
   ensureSettlementState();
+  if (state.visiting) return syncNpcPeople();
   const total = Math.max(0, state.town.people), taken = new Set([state.x + ',' + state.y]);
   townPeople = townPeople.slice(0, total);
   for (const p of townPeople) taken.add(p.x + ',' + p.y);
@@ -294,19 +300,21 @@ function moveTownPeople() {
 }
 
 // ---------------------------------------------------------------- entering and leaving
-function enterTown() {
+function enterTown(quiet) {
   ensureSettlementState();
+  state.visiting = null; townPeople = []; townPathCache.clear();
   state.zone = 'town'; state.site = null; state.returnPoint = null; state.view = 'explore';
   map = getTownMap(); state.x = TOWN_START[0]; state.y = TOWN_START[1];
   syncTownPeople();
-  say('You walk into Brackenford. Bump a building door (or press E beside it) to go in; talk to anyone by walking into them.', 'gold');
+  if (!quiet) say('You walk into Brackenford. Bump a building door (or press E beside it) to go in; talk to anyone by walking into them.', 'gold');
   render();
 }
 function exitTown() {
   if (state.zone !== 'town') return;
   closeDialog();
-  map = overworld; state.zone = 'overworld'; state.x = HOME.x; state.y = HOME.y; state.view = 'explore';
-  say('You leave Brackenford for the wilds.');
+  const from = state.visiting ? townById(state.visiting) : null;
+  map = overworld; state.zone = 'overworld'; state.visiting = null; state.x = from ? from.x : HOME.x; state.y = from ? from.y : HOME.y; state.view = 'explore'; townPeople = [];
+  say(from ? 'You leave ' + from.name + ' for the wilds.' : 'You leave Brackenford for the wilds.');
   render();
 }
 function townBump(nx, ny) {
@@ -349,6 +357,7 @@ const TALK = {
 };
 function talkLine(p) {
   const lines = TALK[p.job] || TALK.idle, pick = lines[(townHash(p.idx + state.day, p.id.length) % lines.length)];
+  if (state.visiting) return pick + ' ' + visitorGossip(p);
   const extra = [];
   if (state.starving) extra.push('We’re going hungry. Please, bring food.');
   else if (state.town.food < state.town.people * 2) extra.push('The pantry is running low.');
@@ -376,6 +385,7 @@ function buildPrompt(key) {
   showDialog('<h2>Empty plot</h2><p>A fenced lot waits for a ' + bld(key).toLowerCase() + '.</p>' + tail + '<button onclick="closeDialog()">Leave</button>');
 }
 function openBuilding(key) {
+  if (state.visiting) { npcBuilding(key); return; }
   if (!state.built[key]) { buildPrompt(key); return; }
   syncTownPeople();
   const svc = SERVICES[key];
@@ -506,7 +516,8 @@ const SERVICES = {
 function drawTownCell(ctx, c, x, y, px, py, frame) {
   const T = GFX.T;
   if (c === '▣' || c === '▤') {
-    const key = plotContaining(x, y), p = TOWN_PLOTS[key];
+    const key = plotContaining(x, y), p = townPlots()[key];
+    if (state.visiting) { const a = npcPlotArt(key); GFX.townPlot(ctx, a.art, true, x - p.x0, y - p.y0, p.x1 - p.x0 + 1, p.y1 - p.y0 + 1, c === '▤', px, py, a.tier, p.door[0] - p.x0); return; }
     GFX.townPlot(ctx, key, !!state.built[key], x - p.x0, y - p.y0, p.x1 - p.x0 + 1, p.y1 - p.y0 + 1, c === '▤', px, py, state.town.tier || 1, p.door[0] - p.x0);
     return;
   }
@@ -533,6 +544,7 @@ function dailyOutput(key, perWorker) {
 }
 
 function renderTown() {
+  if (state.visiting) { renderVisitPanel(); return; }
   ensureSettlementState();
   const tier = state.town.tier || 1, built = Object.values(state.built).filter(Boolean).length, goal = UPGRADE_KEYS.length;
   const evo = tier < 3 || !state.town.maxed ? tierProgress() + ' / ' + goal + ' upgrades' : 'Fully evolved';
@@ -562,7 +574,7 @@ function renderTown() {
 }
 
 // ---------------------------------------------------------------- drawing the settlement
-function townView() { return [Math.max(0, Math.min(TOWN_W - 25, state.x - 12)), Math.max(0, Math.min(TOWN_H - 15, state.y - 7))]; }
+function townView() { return [Math.max(0, Math.min(townW() - 25, state.x - 12)), Math.max(0, Math.min(townH() - 15, state.y - 7))]; }
 function renderTownGfx(ctx, W, H, frame, now) {
   const T = GFX.T, [left, top] = townView(), folks = townPeopleMap();
   for (let j = 0; j < 15; j++) for (let i = 0; i < 25; i++) {
@@ -571,13 +583,13 @@ function renderTownGfx(ctx, W, H, frame, now) {
     drawTownCell(ctx, c, x, y, px, py, frame);
     const p = folks.get(x + ',' + y);
     if (x === state.x && y === state.y) { const pp = poseOf('player', now, 0); GFX.shadow(ctx, px, py); GFX.sprite(ctx, 'player', px, py, 1, facing < 0, pp); }
-    else if (p) { const pp = poseOf(p.id, now, x * 3 + y); GFX.shadow(ctx, px, py); GFX.sprite(ctx, p.job === 'barracks' ? 'soldier' : GFX.workerKey(p.id), px, py, 1, pp.fx < 0, pp); }
+    else if (p) { const pp = poseOf(p.id, now, x * 3 + y); GFX.shadow(ctx, px, py); GFX.sprite(ctx, p.job === 'barracks' || p.job === 'guard' ? 'soldier' : GFX.workerKey(p.id), px, py, 1, pp.fx < 0, pp, currentColor()); }
   }
   ctx.font = 'bold 7px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 2; ctx.strokeStyle = '#14181a'; ctx.fillStyle = '#f3de8f';
-  for (const [key, p] of Object.entries(TOWN_PLOTS)) {
+  for (const [key, p] of Object.entries(townPlots())) {
     const cx = ((p.x0 + p.x1 + 1) / 2 - left) * T, cy = (p.y0 - top + (key === 'well' ? -0.2 : 1.1)) * T;
     if (cx < -40 || cx > W + 40 || cy < 0 || cy > H) continue;
-    const label = state.built[key] ? buildingName(key) : 'Empty plot · ' + buildingName(key);
+    const label = state.visiting ? npcLabel(key) : state.built[key] ? buildingName(key) : 'Empty plot · ' + buildingName(key);
     ctx.strokeText(label, cx, cy); ctx.fillText(label, cx, cy);
   }
   ctx.fillStyle = '#ffffff';
@@ -593,8 +605,8 @@ function renderTownGfx(ctx, W, H, frame, now) {
 function townTextCell(x, y, c, folks) {
   if (x === state.x && y === state.y) return ['@', 'player'];
   const p = folks.get(x + ',' + y);
-  if (p) return p.job === 'barracks' ? ['s', 'soldier'] : ['w', 'worker'];
-  if (c === '▣') return state.built[plotContaining(x, y)] ? ['▣', 'town'] : ['░', 'fog'];
+  if (p) return p.job === 'barracks' || p.job === 'guard' ? ['s', 'soldier', currentColor()] : ['w', 'worker', currentColor()];
+  if (c === '▣') return state.visiting || state.built[plotContaining(x, y)] ? ['▣', 'town'] : ['░', 'fog'];
   if (c === '▤' || c === '▼') return [c, 'town'];
   return [c, c === '♣' ? 'tree' : c === '≈' ? 'water' : c === '▲' ? 'stone' : c === '≡' ? 'berry' : 'path'];
 }

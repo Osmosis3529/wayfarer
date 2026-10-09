@@ -78,7 +78,7 @@ function enemySprite(name){const look=ENEMY_LOOK[name]||['beast','#8c968e','#4a5
 function portrait(name){if(!portraits[name]){const sp=skinOn&&SKIN_PORTRAITS[name],s=sp?cut(skinSheets[sp[0]],sp[1],sp[2]):enemySprite(name),c=document.createElement('canvas');c.width=c.height=96;const x=c.getContext('2d');x.imageSmoothingEnabled=false;x.fillStyle='#111a14';x.fillRect(0,0,96,96);x.drawImage(s,8,8,80,80);portraits[name]=c.toDataURL()}return portraits[name]}
 cache.tree_spent=build(P.treeSpent);cache.rock_spent=build(P.rockSpent);cache.berry_spent=build(P.berry,{r:'#4f8f3c'});cache.ore_spent=build(P.ore,{X:'#3b4540'});
 cache.b_garden=cache.farm;cache.b_well=cache.well;cache.b_warehouse=cache.camp;cache.b_beacon=cache.beacon;
-const SPRITE_OF={'♣':'tree','▲':'rock','%':'berry','?':'chest','g':'enemy','x':'fox','C':'cave','D':'dungeon','K':'keep','M':'mine','S':'town','⌂':'home','<':'stairL','>':'stairR',c:'ore_c',i:'ore_i',s:'ore_s',a:'ore_a','◆':'ore_◆'};
+const SPRITE_OF={'♣':'tree','▲':'rock','%':'berry','?':'chest','g':'enemy','x':'fox','C':'cave','D':'dungeon','K':'keep','M':'mine','S':'town','⌂':'town','<':'stairL','>':'stairR',c:'ore_c',i:'ore_i',s:'ore_s',a:'ore_a','◆':'ore_◆'};
 function hash(x,y){return (Math.imul(x,73856093)^Math.imul(y,19349663))>>>0}
 function base(ctx,kind,x,y,px,py,frame,edges){
  const h=hash(x,y);
@@ -89,7 +89,10 @@ function base(ctx,kind,x,y,px,py,frame,edges){
  for(let k=0;k<3;k++){const sx=(h>>(k*5))&15,sy=(h>>(k*5+3))&15;ctx.fillStyle=k===0?(floor?'#2f3733':'#4a7c44'):(floor?'#1f2522':'#34602f');ctx.fillRect(px+sx,py+sy,1+(k===0?1:0),1)}
  if(edges&&!floor){ctx.fillStyle='#b8a878';if(edges&1)ctx.fillRect(px,py,T,2);if(edges&2)ctx.fillRect(px,py+T-2,T,2);if(edges&4)ctx.fillRect(px,py,2,T);if(edges&8)ctx.fillRect(px+T-2,py,2,T)}
 }
-function sprite(ctx,key,px,py,alpha,flip,pose){const s=cache[key];if(!s)return;ctx.save();if(alpha!=null&&alpha<1)ctx.globalAlpha=alpha;ctx.translate(px+T/2,py+T+(pose&&pose.dy||0));if(pose&&pose.lean)ctx.rotate(pose.lean);if(flip)ctx.scale(-1,1);ctx.drawImage(s,-T/2,-T);ctx.restore()}
+// A copy of a sprite with a coloured band across the chest, so workers of different settlements can be told apart.
+const tintCache={};
+function tinted(key,color){const id=key+'|'+color+'|'+(skinOn?1:0);let c=tintCache[id];if(!c){const src=cache[key];if(!src)return null;c=document.createElement('canvas');c.width=c.height=T;const x=c.getContext('2d');x.drawImage(src,0,0);x.globalCompositeOperation='source-atop';x.globalAlpha=.88;x.fillStyle=color;x.fillRect(2,8,12,6);tintCache[id]=c}return c}
+function sprite(ctx,key,px,py,alpha,flip,pose,tint){const s=tint?tinted(key,tint):cache[key];if(!s)return;ctx.save();if(alpha!=null&&alpha<1)ctx.globalAlpha=alpha;ctx.translate(px+T/2,py+T+(pose&&pose.dy||0));if(pose&&pose.lean)ctx.rotate(pose.lean);if(flip)ctx.scale(-1,1);ctx.drawImage(s,-T/2,-T);ctx.restore()}
 function shadow(ctx,px,py){ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(px+T/2,py+T-1.5,5,2,0,0,Math.PI*2);ctx.fill()}
 function bar(ctx,px,py,frac){ctx.fillStyle='#14181a';ctx.fillRect(px+1,py,T-2,3);ctx.fillStyle=frac>.5?'#7fbf5a':frac>.25?'#e5bd69':'#df4a3a';ctx.fillRect(px+2,py+1,Math.max(1,Math.round((T-4)*frac)),1)}
 function tint(ctx,w,h,a){if(a<=0)return;ctx.fillStyle='rgba(10,20,60,'+a.toFixed(3)+')';ctx.fillRect(0,0,w,h)}
@@ -159,7 +162,7 @@ function plotArt(key,built,tier,w,h,doorCol){
   R('#14181a',W/2-3,H-14,6,10);
   R('#e5bd69',W/2-5,H-46,10,10);R('#f3de8f',W/2-3,H-50,6,8);R('#ff9a3a',W/2-2,H-54,4,6);R('#fff2a8',W/2-1,H-48,2,4);
   return c}
- const HALL=['#9a6c3f','#5b6b8c','#c9a227'],look={hut:[HALL[Math.min(2,Math.max(0,tier-1))],'#e5bd69'],garden:['#d9b44a','#6aa84a'],well:['#6b7075','#7fb2d8'],warehouse:['#7a5a33','#c9a227'],...Object.fromEntries(Object.entries(HOUSES).map(([k,v])=>[k,v]))},[roof,accent]=look[key]||['#8a5a2b','#e5bd69'];
+ const HALL=['#9a6c3f','#5b6b8c','#c9a227'],look={inn:['#3a6f9c','#e5bd69'],travel:['#7a5a33','#df4a3a'],house:['#8a5a2b','#d8c8a0'],house2:['#6b5b8c','#e5bd69'],house3:['#3b7a6b','#e0b894'],hut:[HALL[Math.min(2,Math.max(0,tier-1))],'#e5bd69'],garden:['#d9b44a','#6aa84a'],well:['#6b7075','#7fb2d8'],warehouse:['#7a5a33','#c9a227'],...Object.fromEntries(Object.entries(HOUSES).map(([k,v])=>[k,v]))},[roof,accent]=look[key]||['#8a5a2b','#e5bd69'];
  const roofH=(h-2)*T,wallY=roofH,wall=key==='mine'?'#6a6f73':key==='barracks'?'#a89a86':'#d8c8a0';
  R(shade(roof,-.1),0,0,W,roofH);
  for(let j=0;j<roofH;j+=4){R(shade(roof,-.28),0,j+3,W,1);for(let i=((j/4)&1)*4;i<W;i+=8)R(shade(roof,-.16),i,j,1,3)}
@@ -180,6 +183,8 @@ function plotArt(key,built,tier,w,h,doorCol){
  if(key==='huntersLodge'){R('#e0b894',W/2-5,roofH-10,10,4);R('#6b4a2b',W/2-6,roofH-12,2,6);R('#6b4a2b',W/2+4,roofH-12,2,6)}
  if(key==='warehouse'){R('#9a6c3f',4,H-9,9,7);R('#c9a227',4,H-9,9,1);R('#7a5a33',W-14,H-12,10,10);R('#c9a227',W-14,H-12,10,1);R('#c9a227',W-10,H-12,1,10)}
  if(key==='garden'){for(let i=2;i<W-2;i+=4)R(i%8?'#6aa84a':'#e5bd69',i,wallY-5,2,3)}
+ if(key==='inn'){R('#e5bd69',W/2-7,roofH-9,14,6);R('#6b4a2b',W/2-1,roofH-13,2,5);R('#14181a',W/2-5,roofH-8,10,1)}
+ if(key==='travel'){R('#6b4a2b',4,H-10,12,7);R('#cfd6dc',6,H-5,3,3);R('#cfd6dc',12,H-5,3,3);R('#df4a3a',W-9,2,7,5)}
  if(key==='hut'){
   R(shade(roof,.15),W/2-9,2,18,5);
   if(tier>=2){R('#cfd6dc',4,4,3,roofH-8);R('#df4a3a',7,4,7,5)}

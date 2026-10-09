@@ -52,9 +52,14 @@ test('text from a save file is escaped', () => game(async page => {
     saveWorld(); const d = JSON.parse(localStorage.getItem(SAVE_KEY));
     d.settlements[0] = { ...d.settlements[0], name: '<img src=x onerror=window.pwn=1>', id: "a');window.pwn=2;('", discovered: true };
     hydrateWorld(d); manualPause = true;
-    return { imgs: document.querySelectorAll('#settlement-list img').length, pwn: window.pwn, id: settlements[0].id };
+    openMap(); const map = { imgs: document.querySelectorAll('#dialog img').length, text: document.getElementById('dialog').textContent.includes('<img src=x') };
+    closeDialog(); enterSettlement(settlements[0].id);
+    const plots = Object.entries(npcMap().plots), hall = plots.find(([, p]) => p.kind === 'hall')[0];
+    renderTown(); const panel = document.querySelectorAll('#town-stats img, #townfolk img').length;
+    npcBuilding(hall); const hallImgs = document.querySelectorAll('#dialog img').length;
+    return { map, panel, hallImgs, pwn: window.pwn, id: settlements[0].id };
   });
-  assert.equal(r.imgs, 0); assert.equal(r.pwn, undefined); assert.match(r.id, /^\w+$/);
+  assert.equal(r.map.imgs, 0); assert.equal(r.map.text, true); assert.equal(r.panel, 0); assert.equal(r.hallImgs, 0); assert.equal(r.pwn, undefined); assert.match(r.id, /^\w+$/);
 }));
 
 test('harvest yields fall, patches regrow, woods are walkable', () => game(async page => {
@@ -269,8 +274,8 @@ test('towns have regional goods and trading requires being in town', () => game(
     const prices = { cheapBuy: regionPrice({ ...t, bias: 0 }, cheap, 'buy') - buyPrices[cheap], dearSell: regionPrice({ ...t, bias: 0 }, dear, 'sell') - sellPrices[dear] };
     state.x = HOME.x; state.y = HOME.y; closeDialog(); trade(t.id); const farAway = document.getElementById('overlay').style.display;
     state.x = t.x; state.y = t.y; trade(t.id); const inTown = document.getElementById('overlay').style.display;
-    renderSettlements();
-    return { prices, farAway, inTown, listHasButton: !!document.querySelector('#settlement-list button'), distinct: settlements.every(s => s.surplus.length === 2 && s.scarce.length === 2 && !s.surplus.some(k => s.scarce.includes(k))) };
+    closeDialog(); openMap(); const rideButtons = [...document.querySelectorAll('#dialog button')].filter(b => b.textContent.startsWith('Ride') && !b.disabled).length;
+    return { prices, farAway, inTown, listHasButton: rideButtons > 0, distinct: settlements.every(s => s.surplus.length === 2 && s.scarce.length === 2 && !s.surplus.some(k => s.scarce.includes(k))) };
   });
   assert.ok(r.prices.cheapBuy < 0); assert.ok(r.prices.dearSell > 0);
   assert.notEqual(r.farAway, 'grid'); assert.equal(r.inTown, 'grid'); assert.equal(r.listHasButton, false); assert.equal(r.distinct, true);

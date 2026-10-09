@@ -193,6 +193,7 @@ function declareWar(id) {
   const placed = placeFoes(s, foes, 2, 5);
   if (!placed) { say('There is no open ground around ' + s.name + ' for a battle. Try again later.', 'alert'); return false; }
   state.wars[id] = { total: placed, left: placed };
+  if (state.zone === 'town' && state.visiting === id) exitTown();                     // its gates close behind you
   say('You declare war on ' + s.name + '! Its ' + placed + ' defenders take up arms around the town. Defeat every one of them to annex it.', 'alert');
   render();
   return true;
@@ -352,14 +353,4 @@ function worldTurn() {
     if (canRaidPlayer && (!others.length || Math.random() < .5)) startRaid(s);
     else if (others.length) npcConflict(s, others[Math.floor(Math.random() * others.length)]);
   }
-}
-
-function renderSettlements() {
-  ensureWarWorld();
-  const known = settlements.filter(s => s.discovered), node = document.getElementById('settlement-list'), names = l => (l || []).map(k => itemNames[k]).join(', ');
-  if (!known.length) { node.innerHTML = '<p class="settlement-empty">No trade partners charted yet. Explore beyond Brackenford; towns appear on this map when you get close enough to find them. You must travel to a town to trade there.</p>'; return; }
-  node.innerHTML = known.map(s => {
-    const w = state.wars[s.id], status = s.owner === 'player' ? 'Annexed' : w ? 'At war: ' + w.left + ' / ' + w.total + ' defenders' : [moodOf(s), ownerText(s)].filter(Boolean).join(' · ');
-    return '<div class="settlement-row"><div><strong>' + esc(s.name) + '</strong><span>' + Math.round(Math.hypot(s.x - HOME.x, s.y - HOME.y)) + ' leagues from home · ' + s.people + ' citizens · ' + esc(status) + '<br>Plentiful: ' + esc(names(s.surplus)) + ' · Wanted: ' + esc(names(s.scarce)) + '</span></div></div>';
-  }).join('');
 }
