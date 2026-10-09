@@ -274,7 +274,7 @@ test('towns have regional goods and trading requires being in town', () => game(
     const prices = { cheapBuy: regionPrice({ ...t, bias: 0 }, cheap, 'buy') - buyPrices[cheap], dearSell: regionPrice({ ...t, bias: 0 }, dear, 'sell') - sellPrices[dear] };
     state.x = HOME.x; state.y = HOME.y; closeDialog(); trade(t.id); const farAway = document.getElementById('overlay').style.display;
     state.x = t.x; state.y = t.y; trade(t.id); const inTown = document.getElementById('overlay').style.display;
-    closeDialog(); openMap(); const rideButtons = [...document.querySelectorAll('#dialog button')].filter(b => b.textContent.startsWith('Ride') && !b.disabled).length;
+    closeDialog(); state.coin = 0; openMap(); const rideButtons = [...document.querySelectorAll('#dialog button')].filter(b => b.textContent.startsWith('Ride') && !b.disabled).length;
     return { prices, farAway, inTown, listHasButton: rideButtons > 0, distinct: settlements.every(s => s.surplus.length === 2 && s.scarce.length === 2 && !s.surplus.some(k => s.scarce.includes(k))) };
   });
   assert.ok(r.prices.cheapBuy < 0); assert.ok(r.prices.dearSell > 0);
