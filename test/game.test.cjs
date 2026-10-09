@@ -481,7 +481,8 @@ test('defeating a guardian grants a relic with its effect, and relics survive de
       if (depth) { state.mineDepth = depth; state.site.layers = state.site.layers || {}; if (!state.site.layers[depth]) state.site.layers[depth] = makeInstance('mine', depth, site); map = state.site.layers[depth]; ensureBoss(site, map, depth); }
       let pos = null; for (const [k, e] of enemyBucket(map)) { const [x, y] = k.split(',').map(Number); if (e.mini && map[y][x] === 'g') pos = [x, y]; }
       state.x = pos[0] - 1; state.y = pos[1]; startCombat(pos[0], pos[1], state.x, state.y); const boss = state.combat.enemy.name;
-      state.combat.hp = 1; battleAction('heavy'); closeDialog(); return boss;
+      state.combat.hp = 1; const real = Math.random; Math.random = () => 0.99; try { battleAction('heavy'); } finally { Math.random = real; }   // no random gear drop to muddy the heart count
+      closeDialog(); return boss;
     };
     const dun = dungeons.find(d => d.miniBoss === 'aegis'), maxHp0 = state.maxHp, lvl0 = state.level;
     const boss = fight(dun); const got = { relic: state.relics.aegis, hearts: state.maxHp - maxHp0 - (state.level - lvl0) };   // minus the hearts from levelling up

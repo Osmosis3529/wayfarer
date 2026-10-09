@@ -24,12 +24,18 @@ Five **guardians** hold ancient relics: two in dungeons, two at the bottom of mi
 
 Stand on the home tile (⌂) and press **E** to walk into Brackenford, a detailed 60×40 map with roads, a plaza, fields, a lake and a plot for every building. Bump an empty plot to build there; bump a built door (or press E beside it) to go inside. Press M beside home for the explored-world chart.
 
-- **The hall** (longhouse → town hall → city hall as the settlement evolves) assigns citizens to jobs, sells building upgrades, and lets you rest for free. It also sets how many citizens can live in Brackenford (8, 16, then 28).
+- **The hall** (longhouse → town hall → city hall as the settlement evolves) assigns citizens to jobs, sells building upgrades, and lets you rest for free. It also sets how many citizens can live in Brackenford (14, then 26, then 38).
+- **Population follows the pantry.** Newcomers arrive only once there is a hall, and the fuller the pantry is after the day's eating the faster they come: about 2 meals per citizen brings the odd traveler, 4 brings one a day, 8 brings two a day (up to the housing limit). The panel's Growth line says which it is today.
+- **Staffing.** Every working building needs its own citizen: you can only build one while there are more citizens than working buildings (the hall and the Beacon need nobody). Upgrades need more: at least 1 citizen per building in a Village, 2 per building in a Town and 3 in a City.
 - **Jobs.** Citizens start out without work. Assign them from the hall: each building holds a limited number of workers, and its output is per worker (soldiers have no limit). A building with nobody working in it stays closed.
 - **Buildings you can enter**: the trading post, lumber mill, tannery, farm, hunters' lodge and gem hall buy and sell goods (specialists pay more for their own); the fishing hut and hunting camp sell meals for the pantry; the well heals you once a day; the smithy crafts gear; the mine has a shaft down into Brackenford Mine; the barracks shows your soldiers. Talk to any citizen by walking into them.
 - **Routes.** Gatherers walk between their building and their worksite (farm fields, forest, lake, hills); soldiers patrol the roads around the plaza.
 - **Upgrades and evolution.** Every building has one upgrade per tier (+50% output for its workers). Buy *all* of a tier's upgrades and Brackenford evolves to the next tier: the hall grows, buildings hold more workers, the upgrade list resets, and each upgrade now costs more (x1, x2, x3). The City tier is the last one; once every upgrade is bought there, the settlement is fully evolved.
 - **Soldiers** are citizens assigned to the barracks. They patrol and fight near home, and the best weapon and armor you own set their damage and health.
+
+## Caves and dungeons
+
+Caves and dungeons are large winding mazes with loops, dead ends and chambers, and they are dark: you only see a circle of light around you (walls block it, so you see the wall but not what is behind it). Tiles you have lit stay faintly remembered. A **torch** burns for 120 steps and throws light twice as far: press **T** (or the torch button on a phone) to light one. The trading post and the lumber mill sell them (the mill is cheaper), caravans sell them, and caches in caves and dungeons sometimes hold some. The Delver's Lantern relic adds a little permanent light. Mines are not dark.
 
 ## War, soldiers and rival settlements
 
@@ -37,6 +43,16 @@ Stand on the home tile (⌂) and press **E** to walk into Brackenford, a detaile
 - **Everyone to the barracks.** The war council can call every citizen to arms in one click (production stops), and "stand down" puts everyone back in their old jobs.
 - **Wars of conquest.** Once you have a barracks, declare war on any settlement you have found, from the war council in the hall or barracks, or from inside the settlement itself. Its citizens come out as town guards (and a captain) and hold the ground around their town. Beat every defender, with your own hands or your soldiers', and the settlement is annexed: plunder, a few survivors join Brackenford, room for 4 more citizens at home, and a daily tribute of coin and goods. Merchants close their gates while you are at war; you can make peace for coin, but they will remember it.
 - **Aggression.** Every other settlement has a size and a randomized temper (peaceful, wary or hostile) that drifts over time. Hostile ones raid Brackenford: raiders appear far from home, warn you, and march on the settlement. Cut them down before they reach it or they ransack the pantry. Driving off a raid pays a reward and cools the raiders down. Settlements also attack each other (you hear about the ones you have found), and a weak one can be taken over by its neighbor.
+
+## Play it from the web (iPhone, iPad, Android, anywhere)
+
+The game can also be hosted as a web app that installs to a phone's home screen, runs full screen and works offline. A GitHub Actions workflow ("Deploy web app") publishes it to GitHub Pages on every push to `main`. It costs nothing for a public repository.
+
+- **One-time setup:** in the repository's Settings → Pages, set *Build and deployment → Source* to **GitHub Actions**. Then run the "Deploy web app" workflow from the Actions tab (or push to `main`). The address will be `https://<your-github-name>.github.io/<repository-name>/`.
+- **iPhone / iPad:** open the address in Safari, tap the Share button, then **Add to Home Screen**. **Android:** in Chrome, menu → *Install app*.
+- **Saves** are kept in the browser on that device. Installed apps are the safest place for them, but use **Export save** now and then: on a phone it opens the share sheet (Save to Files, AirDrop, ...), and **Load World from Save File** brings it back.
+- **Updates** download in the background after each deploy; the game says when a new version is ready and you reload to play it.
+- **Try it locally:** `npm run web:pwa` builds the hosted version into `site/`; serve that folder with any static web server (for example `python3 -m http.server -d site`) and open `http://localhost:8000`. Service workers only run on `localhost` or HTTPS.
 
 ## Troubleshooting
 
@@ -52,7 +68,7 @@ printf electron > node_modules/electron/path.txt
 
 ## Tests
 
-`npm test` runs browser-driven checks of the game rules (saving and loading, harvesting, combat, respawns, the boss and the beacon, settlement jobs, routes and upgrades). Run `npx playwright-core install chromium` once first, or point `WAYFARER_BROWSER` at an existing Chrome or Chromium binary.
+`npm test` runs browser-driven checks of the game rules (saving and loading, harvesting, combat, respawns, the boss and the beacon, settlement jobs, routes and upgrades, the dark mazes, and the offline web-app build). Run `npx playwright-core install chromium` once first, or point `WAYFARER_BROWSER` at an existing Chrome or Chromium binary.
 
 ## Phone and tablet (Android)
 
