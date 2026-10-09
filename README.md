@@ -44,6 +44,16 @@ Caves and dungeons are large winding mazes with loops, dead ends and chambers, a
 - **Wars of conquest.** Once you have a barracks, declare war on any settlement you have found, from the war council in the hall or barracks, or from inside the settlement itself. Its citizens come out as town guards (and a captain) and hold the ground around their town. Beat every defender, with your own hands or your soldiers', and the settlement is annexed: plunder, a few survivors join Brackenford, room for 4 more citizens at home, and a daily tribute of coin and goods. Merchants close their gates while you are at war; you can make peace for coin, but they will remember it.
 - **Aggression.** Every other settlement has a size and a randomized temper (peaceful, wary or hostile) that drifts over time. Hostile ones raid Brackenford: raiders appear far from home, warn you, and march on the settlement. Cut them down before they reach it or they ransack the pantry. Driving off a raid pays a reward and cools the raiders down. Settlements also attack each other (you hear about the ones you have found), and a weak one can be taken over by its neighbor.
 
+## Play it from the web (iPhone, iPad, Android, anywhere)
+
+The game can also be hosted as a web app that installs to a phone's home screen, runs full screen and works offline. A GitHub Actions workflow ("Deploy web app") publishes it to GitHub Pages on every push to `main`. It costs nothing for a public repository.
+
+- **One-time setup:** in the repository's Settings → Pages, set *Build and deployment → Source* to **GitHub Actions**. Then run the "Deploy web app" workflow from the Actions tab (or push to `main`). The address will be `https://<your-github-name>.github.io/<repository-name>/`.
+- **iPhone / iPad:** open the address in Safari, tap the Share button, then **Add to Home Screen**. **Android:** in Chrome, menu → *Install app*.
+- **Saves** are kept in the browser on that device. Installed apps are the safest place for them, but use **Export save** now and then: on a phone it opens the share sheet (Save to Files, AirDrop, ...), and **Load World from Save File** brings it back.
+- **Updates** download in the background after each deploy; the game says when a new version is ready and you reload to play it.
+- **Try it locally:** `npm run web:pwa` builds the hosted version into `site/`; serve that folder with any static web server (for example `python3 -m http.server -d site`) and open `http://localhost:8000`. Service workers only run on `localhost` or HTTPS.
+
 ## Troubleshooting
 
 If `npm start` says "Electron failed to install correctly", npm may have blocked Electron's download script. Run `npm install-scripts approve electron` and then `npm install` again. If it still fails, unpack the cached download by hand:
@@ -58,7 +68,7 @@ printf electron > node_modules/electron/path.txt
 
 ## Tests
 
-`npm test` runs browser-driven checks of the game rules (saving and loading, harvesting, combat, respawns, the boss and the beacon, settlement jobs, routes and upgrades). Run `npx playwright-core install chromium` once first, or point `WAYFARER_BROWSER` at an existing Chrome or Chromium binary.
+`npm test` runs browser-driven checks of the game rules (saving and loading, harvesting, combat, respawns, the boss and the beacon, settlement jobs, routes and upgrades, the dark mazes, and the offline web-app build). Run `npx playwright-core install chromium` once first, or point `WAYFARER_BROWSER` at an existing Chrome or Chromium binary.
 
 ## Phone and tablet (Android)
 

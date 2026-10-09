@@ -10,6 +10,7 @@
     "dist": "electron-builder --win nsis",
     "test": "node --test test/*.test.cjs",
     "web:build": "node scripts/build-web.cjs",
+    "web:pwa": "node scripts/build-web.cjs --out site --pwa",
     "android:sync": "npm run web:build && cap sync android",
     "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug"
   },

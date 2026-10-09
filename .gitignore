@@ -7,3 +7,4 @@ dist/
 .gh-config/
 .gitconfig-auth
 www/
+site/
