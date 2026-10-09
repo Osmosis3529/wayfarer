@@ -32,6 +32,7 @@
   const press = (id, fn) => $(id).addEventListener('pointerdown', e => { e.preventDefault(); fn(); });
   press('t-interact', () => { if (!blocked()) interact(); });
   press('t-eat', () => { if (!blocked()) eat(); });
+  press('t-torch', () => { if (!blocked()) lightTorch(); });
   press('t-pause', () => togglePause());
   press('t-menu', toggleDrawer);
   $('drawer-close').addEventListener('click', closeDrawer);

@@ -21,14 +21,14 @@ async function game(fn) {
     window.RICH = () => {
       Object.assign(state.inv, { wood: 9999, stone: 9999, iron: 999, furs: 999, silver: 999, gold: 999, gems: 999, copper: 999, berries: 20 });
       state.unlocked = { smithy: true, huntersLodge: true, gemHall: true };
-      state.coin = 500;
+      state.coin = 500; state.town.people = 40;
     };
     // Plain grass in a rectangle, so a test never depends on the random world.
     window.clearRect = (x0, y0, x1, y1) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (overworld[y] && overworld[y][x] !== undefined && !'SCDKM⌂'.includes(overworld[y][x])) overworld[y][x] = '.'; };
     // An army: a barracks with n soldiers, and the player standing on open ground away from home.
     window.army = (n, at = 20) => {
       RICH(); build('barracks'); state.town.people = n + 2;
-      while (crew('barracks') < n) assignWorker('barracks', 1);
+      for (let i = 0; i < 60 && crew('barracks') < n; i++) assignWorker('barracks', 1);
       syncSoldiers();
       state.x = HOME.x + at; state.y = HOME.y; clearRect(HOME.x - 5, HOME.y - 15, HOME.x + at + 45, HOME.y + 15);
     };

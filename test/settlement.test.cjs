@@ -22,7 +22,7 @@ async function game(fn) {
     window.RICH = () => {
       Object.assign(state.inv, { wood: 9999, stone: 9999, iron: 999, furs: 999, silver: 999, gold: 999, gems: 999, copper: 999, berries: 20 });
       state.unlocked = { smithy: true, huntersLodge: true, gemHall: true };
-      state.coin = 500;
+      state.coin = 500; state.town.people = 40;
     };
     window.BUILD_ALL = () => { RICH(); for (const k of ['hut', 'market', 'garden', 'well', 'smithy', 'huntersLodge', 'gemHall', 'lumberMill', 'mine', 'tannery', 'fishingHut', 'huntingCamp', 'barracks']) build(k); };
     window.dialogText = () => document.getElementById('dialog').textContent;
@@ -93,17 +93,17 @@ test('an empty plot shows its cost and builds from the prompt, hiring a first wo
 
 test('citizens are assigned to jobs within building capacity and the number of free citizens', () => game(async page => {
   const r = await page.evaluate(() => {
-    RICH(); build('hut'); build('lumberMill'); build('garden'); build('market');   // 2 citizens: the first two buildings are staffed
+    RICH(); state.town.people = 3; build('hut'); build('lumberMill'); build('garden'); build('market');   // 3 citizens: each of the three working buildings gets one
     const start = { lumber: crew('lumberMill'), garden: crew('garden'), market: crew('market'), free: unassigned() };
-    assignWorker('market', 1); const nobodyFree = crew('market');
+    assignWorker('lumberMill', 1); const nobodyFree = crew('lumberMill');
     state.town.people = 8;
     assignWorker('market', 1); assignWorker('market', 1); const marketCap = crew('market');
     assignWorker('lumberMill', 1); assignWorker('lumberMill', 1); assignWorker('lumberMill', 1); const lumberCap = crew('lumberMill');
     assignWorker('garden', -1); assignWorker('garden', -1); const gardenOff = crew('garden');
     return { start, nobodyFree, marketCap, lumberCap, gardenOff, free: unassigned(), employed: employed(), capLumber: capacity('lumberMill'), capMarket: capacity('market') };
   });
-  assert.deepEqual(r.start, { lumber: 1, garden: 1, market: 0, free: 0 });
-  assert.equal(r.nobodyFree, 0); assert.equal(r.marketCap, 1); assert.equal(r.lumberCap, 2); assert.equal(r.gardenOff, 0);
+  assert.deepEqual(r.start, { lumber: 1, garden: 1, market: 1, free: 0 });
+  assert.equal(r.nobodyFree, 1); assert.equal(r.marketCap, 1); assert.equal(r.lumberCap, 2); assert.equal(r.gardenOff, 0);
   assert.equal(r.capLumber, 2); assert.equal(r.capMarket, 1);
   assert.equal(r.free, 8 - r.employed);
 }));
@@ -180,19 +180,77 @@ test('buildings hold more workers and the housing limit grows with each tier', (
     state.town.tier = 1; state.built.hut = false; out.noHut = housingCap();
     return out;
   });
-  assert.deepEqual(r.t1, [2, 1, 8]); assert.deepEqual(r.t2, [4, 2, 16]); assert.deepEqual(r.t3, [6, 3, 28]); assert.equal(r.noHut, 2);
+  assert.deepEqual(r.t1, [2, 1, 14]); assert.deepEqual(r.t2, [4, 2, 26]); assert.deepEqual(r.t3, [6, 3, 38]); assert.equal(r.noHut, 2);
 }));
 
-test('newcomers arrive only while the hall has room and the pantry has food', () => game(async page => {
+test('newcomers follow the pantry: none when it is thin, the odd one when it is comfortable, one or two a day when it is full', () => game(async page => {
   const r = await page.evaluate(() => {
-    RICH(); state.town.people = 2; state.town.food = 50;
-    advanceDay(); const noHall = state.town.people;
-    build('hut'); state.town.food = 50; advanceDay(); const withHall = state.town.people;
-    state.town.people = housingCap(); state.town.food = 99; advanceDay(); const full = state.town.people;
-    state.town.people = 3; state.town.food = 1; advanceDay(); const hungry = state.town.people;
-    return { noHall, withHall, full, hungry };
+    RICH(); build('hut');
+    const day = (people, meals, roll) => {                       // meals are the ones in the pantry before the day's eating
+      state.town.people = people; state.town.food = meals; state.starving = false;
+      const real = Math.random; Math.random = () => roll;
+      try { const before = state.town.people; advanceDay(); return state.town.people - before; } finally { Math.random = real; }
+    };
+    const out = { thin: day(4, 5, 0), slowLucky: day(4, 16, 0.1), slowUnlucky: day(4, 16, 0.9), steady: day(4, 24, 0.99), fast: day(4, 40, 0.99) };
+    out.capped = day(housingCap() - 1, 999, 0.99);
+    out.full = day(housingCap(), 999, 0.99);
+    state.built.hut = false; out.noHall = day(4, 40, 0.99);
+    return out;
   });
-  assert.deepEqual(r, { noHall: 2, withHall: 3, full: 8, hungry: 3 });
+  assert.deepEqual(r, { thin: 0, slowLucky: 1, slowUnlucky: 0, steady: 1, fast: 2, capped: 1, full: 0, noHall: 0 });
+}));
+
+test('the growth forecast follows the pantry and the housing', () => game(async page => {
+  const r = await page.evaluate(() => {
+    RICH(); const out = { noHall: growthLabel() };
+    build('hut'); state.town.people = 4;
+    const at = meals => { state.town.food = meals; return growthLabel(); };
+    out.thin = at(5); out.slow = at(12); out.steady = at(20); out.fast = at(40);
+    state.town.people = housingCap(); out.full = at(999);
+    state.town.people = 4; state.starving = true; out.starving = at(40);
+    state.starving = false; state.town.food = 40; renderTown(); out.panel = document.getElementById('town-stats').textContent;
+    return out;
+  });
+  assert.equal(r.noHall, 'needs a longhouse'); assert.ok(r.thin.startsWith('none')); assert.equal(r.slow, 'slow'); assert.equal(r.steady, 'steady'); assert.equal(r.fast, 'fast');
+  assert.equal(r.full, 'housing full'); assert.equal(r.starving, 'starving'); assert.ok(r.panel.includes('Growth') && r.panel.includes('fast'), r.panel);
+}));
+
+test('a working building needs a free citizen: you can only build while citizens outnumber the working buildings', () => game(async page => {
+  const r = await page.evaluate(() => {
+    RICH(); state.town.people = 3;
+    build('market'); build('garden'); build('lumberMill');          // 3 citizens: room for the first three
+    const three = staffedBuildings();
+    build('well'); const blocked = !!state.built.well;
+    buildPrompt('well'); const prompt = dialogText(), button = [...document.querySelectorAll('#dialog button')].some(b => b.textContent.startsWith('Build')); closeDialog();
+    build('hut'); const hut = !!state.built.hut;                     // the hall never needs staff
+    state.town.people = 4; build('well'); const fourth = !!state.built.well;
+    buildPrompt('tannery'); const stillFull = dialogText(); closeDialog();
+    state.town.people = 5; buildPrompt('tannery'); const open = [...document.querySelectorAll('#dialog button')].some(b => b.textContent.startsWith('Build'));
+    return { three, blocked, prompt, button, hut, fourth, stillFull, open, crews: employed() };
+  });
+  assert.equal(r.three, 3); assert.equal(r.blocked, false); assert.ok(r.prompt.includes('Nobody is free'), r.prompt); assert.equal(r.button, false);
+  assert.equal(r.hut, true); assert.equal(r.fourth, true); assert.ok(r.stillFull.includes('Nobody is free'), r.stillFull); assert.equal(r.open, true);
+}));
+
+test('upgrades need one citizen per building in a Village, two in a Town and three in a City', () => game(async page => {
+  const r = await page.evaluate(() => {
+    BUILD_ALL();                                                    // 12 working buildings
+    const need = [1, 2, 3].map(t => staffNeeded(t));
+    const tryUp = (tier, people, key) => { state.town.tier = tier; state.town.people = people; buyUpgrade(key); return hasUpgrade(key, tier); };
+    const out = { need, v11: tryUp(1, 11, 'lumberMill'), v12: tryUp(1, 12, 'lumberMill'), t23: tryUp(2, 23, 'market'), t24: tryUp(2, 24, 'market'), c35: tryUp(3, 35, 'garden'), c36: tryUp(3, 36, 'garden') };
+    state.town.tier = 1; state.town.people = 11; upgradesDialog();
+    out.dialog = dialogText(); out.disabled = [...document.querySelectorAll('#dialog button')].filter(b => b.textContent.startsWith('Upgrade')).every(b => b.disabled);
+    state.town.people = 12; upgradesDialog(); out.enabled = [...document.querySelectorAll('#dialog button')].some(b => b.textContent.startsWith('Upgrade') && !b.disabled);
+    return out;
+  });
+  assert.deepEqual(r.need, [12, 24, 36]);
+  assert.equal(r.v11, false); assert.equal(r.v12, true); assert.equal(r.t23, false); assert.equal(r.t24, true); assert.equal(r.c35, false); assert.equal(r.c36, true);
+  assert.ok(r.dialog.includes('Not enough citizens') && r.dialog.includes('12 needed'), r.dialog); assert.equal(r.disabled, true); assert.equal(r.enabled, true);
+}));
+
+test('the housing limit can hold the citizens a full city needs for its upgrades', () => game(async page => {
+  const r = await page.evaluate(() => { RICH(); build('hut'); return [1, 2, 3].map(t => { state.town.tier = t; return housingCap() >= staffNeeded(t) || [t, housingCap(), staffNeeded(t)]; }); });
+  assert.deepEqual(r, [true, true, true]);
 }));
 
 test('shops need a worker, trade at the building’s own prices, and specialists pay more for their goods', () => game(async page => {
@@ -227,7 +285,7 @@ test('the fishing hut and hunting camp sell meals for the pantry, the well heals
 
 test('the smithy and the mine shaft open from their buildings once someone works there', () => game(async page => {
   const r = await page.evaluate(() => {
-    BUILD_ALL(); state.town.people = 14; for (const k of ['smithy', 'mine']) while (crew(k) < 1) assignWorker(k, 1);
+    BUILD_ALL(); state.town.people = 14; for (const k of ['smithy', 'mine']) for (let i = 0; i < 20 && crew(k) < 1; i++) assignWorker(k, 1);
     openBuilding('smithy'); const smithy = dialogText();
     openBuilding('mine'); const shaft = dialogText();
     closeDialog(); exitToMine(); const down = [state.zone, map === homeMine.layers[1]];
@@ -241,7 +299,7 @@ test('the smithy and the mine shaft open from their buildings once someone works
 test('workers walk back and forth between their building and their worksite, never through walls', () => game(async page => {
   const r = await page.evaluate(() => {
     RICH(); build('lumberMill'); build('fishingHut'); build('garden'); state.town.people = 8;
-    for (const k of ['lumberMill', 'fishingHut', 'garden']) while (crew(k) < 1) assignWorker(k, 1);
+    for (const k of ['lumberMill', 'fishingHut', 'garden']) for (let i = 0; i < 20 && crew(k) < 1; i++) assignWorker(k, 1);
     enterTown(); closeDialog();
     const seen = {}, bad = [];
     for (let i = 0; i < 600; i++) {

@@ -36,6 +36,7 @@
       "gfx.js",
       "settlement.js",
       "war.js",
+      "dark.js",
       "touch.js",
       "assets/**/*",
       "icon.ico",

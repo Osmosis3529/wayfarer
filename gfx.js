@@ -55,6 +55,7 @@ const ICONS={
  iron:{p:['........','........','..XXXXX.','.XYYYYXX','XXXXXXX.','XxxxxxX.','........','........'],o:{X:'#8a95a5',Y:'#c0c8d2',x:'#4a5360'}},
  silver:{p:['........','........','..XXXXX.','.XYYYYXX','XXXXXXX.','XxxxxxX.','........','........'],o:{X:'#cfd6dc',Y:'#ffffff',x:'#8c968e'}},
  gold:{p:['........','........','..XXXXX.','.XYYYYXX','XXXXXXX.','XxxxxxX.','........','........'],o:{X:'#e5bd69',Y:'#fff2a8',x:'#9a7a2b'}},
+ torch:{p:['...Y....','..YoY...','..oYo...','...n....','...n....','...n....','...n....','...K....'],o:{o:'#ff8a2b',Y:'#fff2a8'}},
  furs:{p:['..oooo..','.oOOOOo.','oOOOOOOo','oOoOOoOo','.oOOOOo.','.oO..Oo.','.o....o.','........'],o:{o:'#8a5a2b',O:'#c0803a'}},
  gems:{p:['........','..PPPP..','.PWPPpP.','PPPPPPpP','.PPPPpP.','..PPpP..','...pp...','........']},
  relic_fang:{p:['.WWWW...','..WWWW..','..WWW...','...WW...','...WW...','....W...','........','........'],o:{W:'#e8e4d0'}},
