@@ -44,6 +44,8 @@ if (pwa) {
   for (const f of ['manifest.webmanifest', 'pwa.js']) fs.copyFileSync(path.join(root, 'web', f), path.join(out, f));
 }
 fs.writeFileSync(path.join(out, 'index.html'), html);
+// The game used to live at wayfarer.html; keep old links and bookmarks working on the hosted site.
+if (pwa) fs.writeFileSync(path.join(out, 'wayfarer.html'), '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=./"><title>Wayfarer</title><script>location.replace("./" + location.search + location.hash)</script><p><a href="./">Play Wayfarer</a></p>\n');
 
 if (pwa) {
   // Everything the offline copy needs, and a version that changes whenever any of it does.
