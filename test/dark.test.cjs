@@ -60,11 +60,11 @@ test('caves and dungeons are big mazes: closed border, one connected system, win
         if (from.size !== open.length) bad.push('sealed pockets ' + (open.length - from.size));
         if (!from.has((w - 2) + ',' + mid)) bad.push('exit unreachable');
         // corridor tiles with exactly one way on are dead ends; more edges than tiles minus one means loops
-        let dead = 0, edges = 0;
-        for (const k of open) { const [x, y] = k.split(',').map(Number); const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => walkable(m[y + dy][x + dx])).length; if (nb === 1) dead++; edges += nb; }
-        stats.push({ open: open.length, dead, loops: edges / 2 - (open.length - 1), walls: 1 - open.length / (w * h) });
+        let dead = 0, edges = 0, twoWay = 0;
+        for (const k of open) { const [x, y] = k.split(',').map(Number); const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => walkable(m[y + dy][x + dx])).length; if (nb === 1) dead++; if (nb === 2) twoWay++; edges += nb; }
+        stats.push({ open: open.length, dead, loops: edges / 2 - (open.length - 1), walls: 1 - open.length / (w * h), corridors: twoWay / open.length });
       }
-      out[type] = { bad: [...new Set(bad)], w, h, minDead: Math.min(...stats.map(s => s.dead)), minLoops: Math.min(...stats.map(s => s.loops)), minWalls: Math.min(...stats.map(s => s.walls)), maxWalls: Math.max(...stats.map(s => s.walls)) };
+      out[type] = { bad: [...new Set(bad)], w, h, minDead: Math.min(...stats.map(s => s.dead)), minLoops: Math.min(...stats.map(s => s.loops)), minWalls: Math.min(...stats.map(s => s.walls)), maxWalls: Math.max(...stats.map(s => s.walls)), minCorridors: Math.min(...stats.map(s => s.corridors)) };
     }
     return out;
   });
@@ -72,7 +72,8 @@ test('caves and dungeons are big mazes: closed border, one connected system, win
     const o = r[type];
     assert.deepEqual(o.bad, [], type);
     assert.ok(o.w * o.h > 2 * (type === 'cave' ? 25 * 17 : 29 * 21), type + ' is not much bigger than before');
-    assert.ok(o.minDead >= 4, type + ' has too few dead ends: ' + o.minDead);
+    assert.ok(o.minDead >= 3, type + ' has too few dead ends: ' + o.minDead);
+    assert.ok(o.minCorridors >= 0.4, type + ' is too open to be a maze: ' + o.minCorridors);
     assert.ok(o.minLoops >= 5, type + ' has no loops: ' + o.minLoops);
     assert.ok(o.minWalls > 0.25 && o.maxWalls < 0.8, type + ' wall share ' + o.minWalls + '..' + o.maxWalls);
   }

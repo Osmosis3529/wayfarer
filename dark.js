@@ -42,12 +42,12 @@ function mazeGrid(type) {
       for (let y = y0; y < y0 + rh; y++) for (let x = x0; x < x0 + rw; x++) open(x, y);
     }
   } else {
-    for (let i = 0; i < 14; i++) {
-      const r = 2 + rnd(3), cx = 1 + 2 * (2 + rnd((w - 8) / 2)), cy = 1 + 2 * (1 + rnd((h - 4) / 2));
+    for (let i = 0; i < 9; i++) {
+      const r = 2 + rnd(2), cx = 1 + 2 * (2 + rnd((w - 8) / 2)), cy = 1 + 2 * (1 + rnd((h - 4) / 2));
       for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) if (Math.hypot(x - cx, y - cy) <= r + .3) open(x, y);
     }
     const eroded = [];
-    for (let y = 2; y < h - 2; y++) for (let x = 2; x < w - 2; x++) if (g[y][x] === '#' && [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => isOpen(x + dx, y + dy)).length >= 2 && Math.random() < 0.1) eroded.push([x, y]);
+    for (let y = 2; y < h - 2; y++) for (let x = 2; x < w - 2; x++) if (g[y][x] === '#' && [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => isOpen(x + dx, y + dy)).length >= 2 && Math.random() < 0.04) eroded.push([x, y]);
     for (const [x, y] of eroded) open(x, y);
   }
   // A straight stretch inside the entrance, and a chamber before the far exit where the guardians wait.
