@@ -151,7 +151,7 @@ test('autosave is written each day and can be loaded', () => game(async page => 
 
 test('building buttons show the real costs and building deducts them', () => game(async page => {
   const r = await page.evaluate(() => {
-    state.unlocked = { smithy: true, huntersLodge: true, gemHall: true };
+    state.unlocked = { smithy: true, huntersLodge: true, jeweler: true };
     const missing = Object.keys(BUILD_COSTS).filter(k => { buildPrompt(k); return !document.getElementById('dialog').textContent.includes(costLabel(k)); });
     Object.assign(state.inv, { wood: 100, stone: 100, iron: 10, furs: 10, silver: 10, gems: 10, gold: 10 });
     const before = { ...state.inv }; build('huntersLodge');
@@ -279,7 +279,7 @@ test('towns have regional goods and trading requires being in town', () => game(
 test('starvation cuts production by 75% and recovers when fed', () => game(async page => {
   const r = await page.evaluate(() => {
     state.inv.wood = 50; state.inv.stone = 50; build('lumberMill'); state.assign.lumberMill = 4;
-    const day = () => { const b = state.inv.wood; advanceDay(); return state.inv.wood - b; };
+    const day = () => { state.inv.wood = 0; advanceDay(); return state.inv.wood; };            // from empty, so the supply limit never gets in the way
     state.town.food = 0; state.town.people = 2; const first = day(), starvingNow = state.starving;
     const cut = day();                                    // pantry still empty: starving day
     state.starving = false; state.town.food = 50; const normal = day(); const fedFlag = state.starving;

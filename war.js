@@ -338,7 +338,7 @@ function worldTurn() {
     const coin = 3 * owned.length, goods = {};
     for (const s of owned) for (const k of (s.surplus || []).slice(0, 2)) goods[k] = (goods[k] || 0) + 1;
     state.coin += coin;
-    for (const [k, n] of Object.entries(goods)) { state.inv[k] += n; if (k === 'berries') state.town.food += n; }
+    for (const [k, n] of Object.entries(goods)) { addItem(k, n, true); if (k === 'berries') addFood(n); }
     const list = Object.entries(goods).map(([k, n]) => n + ' ' + itemNames[k].toLowerCase());
     say('Annexed settlements send tribute: ' + coin + ' coin' + (list.length ? ', ' + list.join(', ') : '') + '.', 'gold');
   }

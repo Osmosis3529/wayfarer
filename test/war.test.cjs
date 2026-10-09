@@ -20,7 +20,7 @@ async function game(fn) {
     newWorld(); manualPause = true;
     window.RICH = () => {
       Object.assign(state.inv, { wood: 9999, stone: 9999, iron: 999, furs: 999, silver: 999, gold: 999, gems: 999, copper: 999, berries: 20 });
-      state.unlocked = { smithy: true, huntersLodge: true, gemHall: true };
+      state.unlocked = { smithy: true, huntersLodge: true, jeweler: true };
       state.coin = 500; state.town.people = 40;
     };
     // Plain grass in a rectangle, so a test never depends on the random world.
