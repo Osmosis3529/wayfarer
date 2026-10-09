@@ -48,7 +48,7 @@ Caves and dungeons are large winding mazes with loops, dead ends and chambers, a
 
 The game can also be hosted as a web app that installs to a phone's home screen, runs full screen and works offline. A GitHub Actions workflow ("Deploy web app") publishes it to GitHub Pages on every push to `main`. It costs nothing for a public repository.
 
-- **One-time setup:** in the repository's Settings → Pages, set *Build and deployment → Source* to **GitHub Actions**. Then run the "Deploy web app" workflow from the Actions tab (or push to `main`). The address will be `https://<your-github-name>.github.io/<repository-name>/`.
+- **One-time setup:** in the repository's Settings → Pages, set *Build and deployment → Source* to **GitHub Actions** (not "Deploy from a branch": that publishes the README instead of the game). Then run the "Deploy web app" workflow from the Actions tab (or push to `main`). If you switched from the branch option, run the workflow once more afterwards, because the old branch publish can land after it and replace the game with the README. The address will be `https://<your-github-name>.github.io/<repository-name>/`.
 - **iPhone / iPad:** open the address in Safari, tap the Share button, then **Add to Home Screen**. **Android:** in Chrome, menu → *Install app*.
 - **Saves** are kept in the browser on that device. Installed apps are the safest place for them, but use **Export save** now and then: on a phone it opens the share sheet (Save to Files, AirDrop, ...), and **Load World from Save File** brings it back.
 - **Updates** download in the background after each deploy; the game says when a new version is ready and you reload to play it.

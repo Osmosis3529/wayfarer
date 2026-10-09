@@ -60,6 +60,20 @@ test('the hosted build ships every script the page loads, a valid manifest, real
   for (const f of ['index.html', 'dark.js', 'war.js', 'settlement.js', 'gfx.js', 'touch.js', 'pwa.js', 'manifest.webmanifest', 'assets/kenney/kenney-data.js', 'icons/icon-192.png']) assert.ok(cached.includes(f), f + ' would not work offline');
 });
 
+test('old wayfarer.html links on the hosted site land on the game, with or without the network', async () => {
+  const { url } = await serve(site);
+  await page({}, async (p, ctx) => {
+    await p.goto(url + 'wayfarer.html?touch=1');
+    await p.waitForFunction(() => typeof state === 'object');
+    assert.equal(new URL(p.url()).pathname, '/'); assert.ok(p.url().includes('touch=1'));
+    await p.evaluate(() => navigator.serviceWorker.ready); await p.waitForFunction(() => navigator.serviceWorker.controller);
+    await ctx.setOffline(true);
+    await p.goto(url + 'wayfarer.html');
+    await p.waitForFunction(() => typeof state === 'object');
+    assert.equal(new URL(p.url()).pathname, '/');
+  });
+});
+
 test('the build is repeatable, and the Android build gets none of the web-app extras', () => {
   const again = path.join(tmp, 'again'), android = path.join(tmp, 'android');
   build(again, '--pwa'); build(android);
