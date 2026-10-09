@@ -118,6 +118,6 @@ function lightTorch() {
 function cacheTorches() {
   if (!isDark() || Math.random() >= 0.45) return;
   const n = 1 + Math.floor(Math.random() * 2);
-  state.inv.torch += n;
-  say('There ' + (n === 1 ? 'is a torch' : 'are ' + n + ' torches') + ' in the cache.', 'gold');
+  const got = addItem('torch', n, true);
+  if (got) say('There ' + (got === 1 ? 'is a torch' : 'are ' + got + ' torches') + ' in the cache.', 'gold');
 }

@@ -43,7 +43,7 @@ const pngSize = file => { const b = fs.readFileSync(file); assert.equal(b.toStri
 test('the hosted build ships every script the page loads, a valid manifest, real icons and a filled-in service worker', () => {
   const index = fs.readFileSync(path.join(site, 'index.html'), 'utf8');
   for (const src of [...index.matchAll(/<script[^>]+src="([^"]+)"/g)].map(m => m[1])) assert.ok(fs.existsSync(path.join(site, src)), 'missing ' + src);
-  for (const game of ['gfx.js', 'settlement.js', 'war.js', 'dark.js', 'touch.js', 'pwa.js']) assert.ok(index.includes('src="' + game + '"'), game + ' is not loaded');
+  for (const game of ['gfx.js', 'settlement.js', 'war.js', 'dark.js', 'towns.js', 'touch.js', 'pwa.js']) assert.ok(index.includes('src="' + game + '"'), game + ' is not loaded');
   const manifest = JSON.parse(fs.readFileSync(path.join(site, 'manifest.webmanifest'), 'utf8'));
   assert.equal(manifest.display, 'standalone'); assert.equal(manifest.orientation, 'landscape'); assert.equal(manifest.start_url, './'); assert.equal(manifest.scope, './');
   assert.ok(manifest.name && manifest.short_name && manifest.background_color && manifest.theme_color);

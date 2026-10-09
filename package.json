@@ -38,6 +38,7 @@
       "settlement.js",
       "war.js",
       "dark.js",
+      "towns.js",
       "touch.js",
       "assets/**/*",
       "icon.ico",

@@ -20,7 +20,7 @@ async function game(fn) {
     newWorld(); manualPause = true;
     window.RICH = () => {
       Object.assign(state.inv, { wood: 9999, stone: 9999, iron: 999, furs: 999, silver: 999, gold: 999, gems: 999, copper: 999, berries: 20 });
-      state.unlocked = { smithy: true, huntersLodge: true, gemHall: true };
+      state.unlocked = { smithy: true, huntersLodge: true, jeweler: true };
       state.coin = 500; state.town.people = 40;
     };
     // Plain grass in a rectangle, so a test never depends on the random world.
@@ -366,17 +366,17 @@ test('both renderers draw war defenders, raiders and marching soldiers', () => g
     useGfx = true; render(); const gfx = !!document.getElementById('view').width;
     useGfx = false; render(); const text = document.getElementById('map').textContent;
     useGfx = true; render();
-    return { gfx, mob: text.includes('g'), soldier: text.includes('s'), chart: document.getElementById('settlement-list').textContent };
+    return { gfx, mob: text.includes('g'), soldier: text.includes('s') };
   });
   assert.equal(r.gfx, true); assert.equal(r.mob, true);
 }));
 
-test('the settlement chart lists size, temper and war status', () => game(async page => {
+test('the world map lists size, temper and war status', () => game(async page => {
   const r = await page.evaluate(() => {
-    army(3, 10); const s = target(0); s.aggression = 0.5; state.x = HOME.x; state.y = HOME.y; enterHome(); const calm = document.getElementById('settlement-list').textContent;
-    declareWar(s.id); render(); const war = document.getElementById('settlement-list').textContent; s.owner = 'player'; delete state.wars[s.id]; render();
-    return { calm, war, annexed: document.getElementById('settlement-list').textContent, name: s.name };
+    army(3, 10); const s = target(0); s.aggression = 0.5; state.x = HOME.x; state.y = HOME.y; openMap(); const calm = document.getElementById('dialog').textContent;
+    declareWar(s.id); openMap(); const war = document.getElementById('dialog').textContent; s.owner = 'player'; delete state.wars[s.id]; openMap();
+    return { calm, war, annexed: document.getElementById('dialog').textContent, name: s.name, canvas: !!document.getElementById('worldmap') };
   });
   assert.ok(r.calm.includes(r.name) && r.calm.includes('citizens') && r.calm.includes('hostile'), r.calm);
-  assert.ok(r.war.includes('At war'), r.war); assert.ok(r.annexed.includes('Annexed'), r.annexed);
+  assert.ok(r.war.includes('at war'), r.war); assert.ok(r.annexed.includes('annexed by Brackenford'), r.annexed); assert.equal(r.canvas, true);
 }));

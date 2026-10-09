@@ -32,7 +32,7 @@ const P={
  stairR:['...y....','...yy...','yyyyyy..','yyyyyyy.','yyyyyy..','...yy...','...y....','........']
 };
 for(const r of Object.values(P))if(r.length!==8||r.some(x=>x.length!==8))throw new Error('bad sprite');
-const HOUSES={market:['#c9a227','#3a6f9c'],smithy:['#444b50','#ff7a2b'],huntersLodge:['#3b7a3b','#e0b894'],gemHall:['#8a5fb0','#f0a0ff'],lumberMill:['#8a5a2b','#d9a066'],mine:['#6a6f73','#111111'],tannery:['#c0642a','#e8c9a0'],fishingHut:['#3a6f9c','#9ad0f0'],barracks:['#7d2a24','#cfd6dc']};
+const HOUSES={market:['#c9a227','#3a6f9c'],smithy:['#444b50','#ff7a2b'],huntersLodge:['#3b7a3b','#e0b894'],jeweler:['#8a5fb0','#f0a0ff'],lumberMill:['#8a5a2b','#d9a066'],mine:['#6a6f73','#111111'],tannery:['#c0642a','#e8c9a0'],fishingHut:['#3a6f9c','#9ad0f0'],barracks:['#7d2a24','#cfd6dc']};
 const ORES={c:'#d9822b',i:'#5a7fa8',s:'#ffffff',a:'#f3d44a','◆':'#c46bf0'};
 const ENEMY_ART={
  beast:['X.X.....','XXX....X','XEXXXXXX','.XXXXXXX','..XXXXXx','..X.X.X.','..x.x.x.','........'],
@@ -77,8 +77,8 @@ for(const [g,col] of Object.entries(ORES))cache['ore_'+g]=build(P.ore,{X:col});
 function enemySprite(name){const look=ENEMY_LOOK[name]||['beast','#8c968e','#4a524d','#ff4a3a'];return build(ENEMY_ART[look[0]],{X:look[1],x:look[2],E:look[3]})}
 function portrait(name){if(!portraits[name]){const sp=skinOn&&SKIN_PORTRAITS[name],s=sp?cut(skinSheets[sp[0]],sp[1],sp[2]):enemySprite(name),c=document.createElement('canvas');c.width=c.height=96;const x=c.getContext('2d');x.imageSmoothingEnabled=false;x.fillStyle='#111a14';x.fillRect(0,0,96,96);x.drawImage(s,8,8,80,80);portraits[name]=c.toDataURL()}return portraits[name]}
 cache.tree_spent=build(P.treeSpent);cache.rock_spent=build(P.rockSpent);cache.berry_spent=build(P.berry,{r:'#4f8f3c'});cache.ore_spent=build(P.ore,{X:'#3b4540'});
-cache.b_garden=cache.farm;cache.b_well=cache.well;cache.b_huntingCamp=cache.camp;cache.b_beacon=cache.beacon;
-const SPRITE_OF={'♣':'tree','▲':'rock','%':'berry','?':'chest','g':'enemy','x':'fox','C':'cave','D':'dungeon','K':'keep','M':'mine','S':'town','⌂':'home','<':'stairL','>':'stairR',c:'ore_c',i:'ore_i',s:'ore_s',a:'ore_a','◆':'ore_◆'};
+cache.b_garden=cache.farm;cache.b_well=cache.well;cache.b_warehouse=cache.camp;cache.b_beacon=cache.beacon;
+const SPRITE_OF={'♣':'tree','▲':'rock','%':'berry','?':'chest','g':'enemy','x':'fox','C':'cave','D':'dungeon','K':'keep','M':'mine','S':'town','⌂':'town','<':'stairL','>':'stairR',c:'ore_c',i:'ore_i',s:'ore_s',a:'ore_a','◆':'ore_◆'};
 function hash(x,y){return (Math.imul(x,73856093)^Math.imul(y,19349663))>>>0}
 function base(ctx,kind,x,y,px,py,frame,edges){
  const h=hash(x,y);
@@ -89,7 +89,10 @@ function base(ctx,kind,x,y,px,py,frame,edges){
  for(let k=0;k<3;k++){const sx=(h>>(k*5))&15,sy=(h>>(k*5+3))&15;ctx.fillStyle=k===0?(floor?'#2f3733':'#4a7c44'):(floor?'#1f2522':'#34602f');ctx.fillRect(px+sx,py+sy,1+(k===0?1:0),1)}
  if(edges&&!floor){ctx.fillStyle='#b8a878';if(edges&1)ctx.fillRect(px,py,T,2);if(edges&2)ctx.fillRect(px,py+T-2,T,2);if(edges&4)ctx.fillRect(px,py,2,T);if(edges&8)ctx.fillRect(px+T-2,py,2,T)}
 }
-function sprite(ctx,key,px,py,alpha,flip,pose){const s=cache[key];if(!s)return;ctx.save();if(alpha!=null&&alpha<1)ctx.globalAlpha=alpha;ctx.translate(px+T/2,py+T+(pose&&pose.dy||0));if(pose&&pose.lean)ctx.rotate(pose.lean);if(flip)ctx.scale(-1,1);ctx.drawImage(s,-T/2,-T);ctx.restore()}
+// A copy of a sprite with a coloured band across the chest, so workers of different settlements can be told apart.
+const tintCache={};
+function tinted(key,color){const id=key+'|'+color+'|'+(skinOn?1:0);let c=tintCache[id];if(!c){const src=cache[key];if(!src)return null;c=document.createElement('canvas');c.width=c.height=T;const x=c.getContext('2d');x.drawImage(src,0,0);x.globalCompositeOperation='source-atop';x.globalAlpha=.88;x.fillStyle=color;x.fillRect(2,8,12,6);tintCache[id]=c}return c}
+function sprite(ctx,key,px,py,alpha,flip,pose,tint){const s=tint?tinted(key,tint):cache[key];if(!s)return;ctx.save();if(alpha!=null&&alpha<1)ctx.globalAlpha=alpha;ctx.translate(px+T/2,py+T+(pose&&pose.dy||0));if(pose&&pose.lean)ctx.rotate(pose.lean);if(flip)ctx.scale(-1,1);ctx.drawImage(s,-T/2,-T);ctx.restore()}
 function shadow(ctx,px,py){ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(px+T/2,py+T-1.5,5,2,0,0,Math.PI*2);ctx.fill()}
 function bar(ctx,px,py,frac){ctx.fillStyle='#14181a';ctx.fillRect(px+1,py,T-2,3);ctx.fillStyle=frac>.5?'#7fbf5a':frac>.25?'#e5bd69':'#df4a3a';ctx.fillRect(px+2,py+1,Math.max(1,Math.round((T-4)*frac)),1)}
 function tint(ctx,w,h,a){if(a<=0)return;ctx.fillStyle='rgba(10,20,60,'+a.toFixed(3)+')';ctx.fillRect(0,0,w,h)}
@@ -97,7 +100,7 @@ function tint(ctx,w,h,a){if(a<=0)return;ctx.fillStyle='rgba(10,20,60,'+a.toFixed
 // Entries are [sheet, column, row]. Anything not listed keeps the handmade art.
 const SKIN_TILES={tree:['rpg',13,9],tree_spent:['rpg',22,10],rock:['rpg',54,21],rock_spent:['rpg',56,22],berry:['rpg',24,9],berry_spent:['rpg',19,9],chest:['rpg',37,9],enemy:['chars',0,3],foe:['chars',0,8],player:['chars',0,7],worker:['chars',0,5],soldier:['chars',0,11],
  home:['rpg',32,0],town:['rpg',33,0],cave:['rpg',40,8],dungeon:['rpg',42,9],keep:['rpg',44,9],mine:['rpg',36,1],stairL:['rpg',50,25],stairR:['rpg',51,25],ore_spent:['rpg',54,20],
- b_market:['rpg',10,0],b_garden:['rpg',22,11],b_well:['rpg',24,0],b_smithy:['rpg',15,0],b_huntersLodge:['rpg',48,10],b_gemHall:['rpg',43,11],b_lumberMill:['rpg',53,21],b_mine:['rpg',49,21],b_tannery:['rpg',51,12],b_fishingHut:['rpg',53,18],b_huntingCamp:['rpg',46,10],b_barracks:['rpg',50,0],b_beacon:['rpg',18,8]};
+ b_market:['rpg',10,0],b_garden:['rpg',22,11],b_well:['rpg',24,0],b_smithy:['rpg',15,0],b_huntersLodge:['rpg',48,10],b_jeweler:['rpg',43,11],b_lumberMill:['rpg',53,21],b_mine:['rpg',49,21],b_tannery:['rpg',51,12],b_fishingHut:['rpg',53,18],b_warehouse:['rpg',46,10],b_barracks:['rpg',50,0],b_beacon:['rpg',18,8]};
 const SKIN_WORKERS=[[0,5],[1,5],[0,6],[1,6],[0,7],[1,7],[0,9],[1,9]];
 const SKIN_ORES={c:'#d9822b',i:'#7fb2d8',s:'#ffffff',a:'#f3d44a','◆':'#c46bf0'};
 const SKIN_PORTRAITS={'Roadside Bandit':['chars',0,8],'Kobold Delver':['chars',1,3],'Grave Cultist':['chars',1,10],'Moss Troll':['chars',0,3],'Crypt Ogre':['chars',1,8],'Forgotten Warden':['chars',0,11],'The Hollow King':['chars',1,10],'Restless Skeleton':['chars',1,11],'Barrow Ghoul':['chars',1,3]};
@@ -159,7 +162,7 @@ function plotArt(key,built,tier,w,h,doorCol){
   R('#14181a',W/2-3,H-14,6,10);
   R('#e5bd69',W/2-5,H-46,10,10);R('#f3de8f',W/2-3,H-50,6,8);R('#ff9a3a',W/2-2,H-54,4,6);R('#fff2a8',W/2-1,H-48,2,4);
   return c}
- const HALL=['#9a6c3f','#5b6b8c','#c9a227'],look={hut:[HALL[Math.min(2,Math.max(0,tier-1))],'#e5bd69'],garden:['#d9b44a','#6aa84a'],well:['#6b7075','#7fb2d8'],huntingCamp:['#7a5a33','#c9a227'],...Object.fromEntries(Object.entries(HOUSES).map(([k,v])=>[k,v]))},[roof,accent]=look[key]||['#8a5a2b','#e5bd69'];
+ const HALL=['#9a6c3f','#5b6b8c','#c9a227'],look={inn:['#3a6f9c','#e5bd69'],travel:['#7a5a33','#df4a3a'],house:['#8a5a2b','#d8c8a0'],house2:['#6b5b8c','#e5bd69'],house3:['#3b7a6b','#e0b894'],hut:[HALL[Math.min(2,Math.max(0,tier-1))],'#e5bd69'],garden:['#d9b44a','#6aa84a'],well:['#6b7075','#7fb2d8'],warehouse:['#7a5a33','#c9a227'],...Object.fromEntries(Object.entries(HOUSES).map(([k,v])=>[k,v]))},[roof,accent]=look[key]||['#8a5a2b','#e5bd69'];
  const roofH=(h-2)*T,wallY=roofH,wall=key==='mine'?'#6a6f73':key==='barracks'?'#a89a86':'#d8c8a0';
  R(shade(roof,-.1),0,0,W,roofH);
  for(let j=0;j<roofH;j+=4){R(shade(roof,-.28),0,j+3,W,1);for(let i=((j/4)&1)*4;i<W;i+=8)R(shade(roof,-.16),i,j,1,3)}
@@ -173,13 +176,15 @@ function plotArt(key,built,tier,w,h,doorCol){
  if(key==='market'){for(let i=0;i<W;i+=4)R(i%8?'#ffffff':accent,i,wallY+2,4,3)}
  if(key==='smithy'){R('#444b50',W-12,2,8,roofH-4);R('#2b3330',W-12,2,8,2);R('#ff7a2b',W-10,roofH-8,4,3)}
  if(key==='barracks'){R('#6b4a2b',W/2-1,0,2,roofH-2);R('#df4a3a',W/2+1,1,10,6);R('#ffffff',W/2+3,3,3,2)}
- if(key==='gemHall'){R('#f0a0ff',W/2-5,roofH/2-5,10,10);R('#ffffff',W/2-3,roofH/2-3,3,3);R('#8a5fb0',W/2-1,roofH/2+1,4,4)}
+ if(key==='jeweler'){R('#f0a0ff',W/2-5,roofH/2-5,10,10);R('#ffffff',W/2-3,roofH/2-3,3,3);R('#8a5fb0',W/2-1,roofH/2+1,4,4)}
  if(key==='lumberMill'){for(let i=0;i<3;i++)R(i%2?'#d9a066':'#9a6c3f',W-14,H-8-i*4,12,3)}
  if(key==='tannery'){R('#e8c9a0',3,wallY-6,8,10);R('#c0803a',W-12,wallY-6,8,10)}
  if(key==='fishingHut'){R('#9ad0f0',3,wallY-4,12,2);R('#7fb2d8',5,wallY-2,8,2);R('#e0b894',W-10,wallY-6,2,8)}
  if(key==='huntersLodge'){R('#e0b894',W/2-5,roofH-10,10,4);R('#6b4a2b',W/2-6,roofH-12,2,6);R('#6b4a2b',W/2+4,roofH-12,2,6)}
- if(key==='huntingCamp'){R('#8a5a2b',4,H-8,8,3);R('#df4a3a',W-9,wallY-8,5,6)}
+ if(key==='warehouse'){R('#9a6c3f',4,H-9,9,7);R('#c9a227',4,H-9,9,1);R('#7a5a33',W-14,H-12,10,10);R('#c9a227',W-14,H-12,10,1);R('#c9a227',W-10,H-12,1,10)}
  if(key==='garden'){for(let i=2;i<W-2;i+=4)R(i%8?'#6aa84a':'#e5bd69',i,wallY-5,2,3)}
+ if(key==='inn'){R('#e5bd69',W/2-7,roofH-9,14,6);R('#6b4a2b',W/2-1,roofH-13,2,5);R('#14181a',W/2-5,roofH-8,10,1)}
+ if(key==='travel'){R('#6b4a2b',4,H-10,12,7);R('#cfd6dc',6,H-5,3,3);R('#cfd6dc',12,H-5,3,3);R('#df4a3a',W-9,2,7,5)}
  if(key==='hut'){
   R(shade(roof,.15),W/2-9,2,18,5);
   if(tier>=2){R('#cfd6dc',4,4,3,roofH-8);R('#df4a3a',7,4,7,5)}
