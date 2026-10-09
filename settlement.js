@@ -574,10 +574,10 @@ function renderTown() {
 }
 
 // ---------------------------------------------------------------- drawing the settlement
-function townView() { return [Math.max(0, Math.min(townW() - 25, state.x - 12)), Math.max(0, Math.min(townH() - 15, state.y - 7))]; }
+function townView() { const [cols, rows] = viewSize(); return [Math.max(0, Math.min(townW() - cols, state.x - (cols >> 1))), Math.max(0, Math.min(townH() - rows, state.y - (rows >> 1)))]; }
 function renderTownGfx(ctx, W, H, frame, now) {
-  const T = GFX.T, [left, top] = townView(), folks = townPeopleMap();
-  for (let j = 0; j < 15; j++) for (let i = 0; i < 25; i++) {
+  const T = GFX.T, [left, top] = townView(), [cols, rows] = viewSize(), folks = townPeopleMap();
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
     const x = left + i, y = top + j, c = map[y] && map[y][x], px = i * T, py = j * T;
     if (c === undefined) { ctx.fillStyle = '#0b100d'; ctx.fillRect(px, py, T, T); continue; }
     drawTownCell(ctx, c, x, y, px, py, frame);

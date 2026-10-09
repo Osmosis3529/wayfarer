@@ -3,6 +3,14 @@
   "appName": "Wayfarer",
   "webDir": "www",
   "backgroundColor": "#101711",
-  "server": { "androidScheme": "https" },
-  "android": { "allowMixedContent": false }
+  "server": {
+    "url": "https://osmosis3529.github.io",
+    "appStartPath": "/wayfarer/",
+    "androidScheme": "https",
+    "errorPath": "offline.html",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false
+  }
 }

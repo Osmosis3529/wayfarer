@@ -1,28 +1,33 @@
-name: Android debug APK
+name: Android APK
 
-# Builds an installable (sideloadable) debug APK on GitHub's servers.
-# Run it from the Actions tab ("Run workflow"), or it runs on pushes that change the game or the Android project.
+# The Android app is a thin shell that opens the hosted game (see capacitor.config.json), so game updates reach
+# phones through the website and do not need a new APK. This workflow only matters when the shell itself changes
+# (icon, permissions, Android project, Capacitor).
+#
+#  * Every run builds a debug APK you can download from the run page (handy for quick tests).
+#  * If the signing key has been added to the repository secrets (see README, "Updating the Android app"), it also
+#    builds the signed release APK. Runs on main publish that APK as a GitHub Release, which Obtainium watches.
 on:
   workflow_dispatch:
   push:
     paths:
-      - 'wayfarer.html'
-      - 'gfx.js'
-      - 'settlement.js'
-      - 'war.js'
-      - 'dark.js'
-      - 'towns.js'
-      - 'touch.js'
-      - 'assets/**'
       - 'android/**'
       - 'capacitor.config.json'
+      - 'web/offline.html'
       - 'scripts/build-web.cjs'
       - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/android.yml'
 
 jobs:
   apk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # only used to publish the release
+    env:
+      HAVE_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' }}
+      VERSION_CODE: ${{ github.run_number }}
+      VERSION_NAME: 1.0.${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,9 +45,49 @@ jobs:
           packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
       - run: npm ci --ignore-scripts
       - run: npm run android:sync
-      - run: ./gradlew assembleDebug
+
+      - name: Debug APK
+        run: ./gradlew assembleDebug -PwayfarerVersionCode=$VERSION_CODE -PwayfarerVersionName=$VERSION_NAME
         working-directory: android
       - uses: actions/upload-artifact@v4
         with:
           name: wayfarer-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: No signing key yet
+        if: env.HAVE_KEY != 'true'
+        run: echo "::notice::Only the debug APK was built. Add ANDROID_KEYSTORE_BASE64 and ANDROID_KEYSTORE_PASSWORD to the repository secrets to get a signed release APK (README, Updating the Android app)."
+
+      - name: Signed release APK
+        if: env.HAVE_KEY == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          WAYFARER_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          WAYFARER_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          WAYFARER_KEY_ALIAS: wayfarer
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/wayfarer.keystore"
+          export WAYFARER_KEYSTORE="$RUNNER_TEMP/wayfarer.keystore"
+          ./gradlew assembleRelease -PwayfarerVersionCode=$VERSION_CODE -PwayfarerVersionName=$VERSION_NAME
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/wayfarer.apk"
+          rm -f "$RUNNER_TEMP/wayfarer.keystore"
+          # The signing certificate must be identical on every build; compare this fingerprint between runs.
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$RUNNER_TEMP/wayfarer.apk" | tee certs.txt
+          { echo "### Signed Wayfarer $VERSION_NAME (version code $VERSION_CODE)"; echo '```'; grep 'SHA-256' certs.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+        working-directory: android
+      - name: Keep the signed APK with the run
+        if: env.HAVE_KEY == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wayfarer-release-apk
+          path: ${{ runner.temp }}/wayfarer.apk
+
+      - name: Publish the release
+        if: env.HAVE_KEY == 'true' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "android-$VERSION_NAME" "$RUNNER_TEMP/wayfarer.apk" \
+            --target "$GITHUB_SHA" --latest \
+            --title "Wayfarer for Android $VERSION_NAME" \
+            --notes "Install this over the previous version; saves are kept. The game itself updates over the internet and does not need a new APK, so a new version here only means the Android shell changed."

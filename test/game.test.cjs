@@ -408,9 +408,9 @@ test('phone layout fits a landscape screen with no scrolling', () => phone(async
   const r = await page.evaluate(() => {
     const cv = document.getElementById('view').getBoundingClientRect(), dp = document.getElementById('dpad').getBoundingClientRect();
     return { touch: document.body.classList.contains('touch'), sx: document.documentElement.scrollWidth - innerWidth, sy: document.documentElement.scrollHeight - innerHeight,
-      canvasBottom: Math.round(cv.bottom), canvasW: Math.round(cv.width), dpadVisible: dp.width > 0, rotate: getComputedStyle(document.getElementById('rotate-hint')).display, h: innerHeight };
+      canvasBottom: Math.round(cv.bottom), canvasW: Math.round(cv.width), dpadVisible: dp.width > 0, cols: cv.width / 16, h: innerHeight };
   });
-  assert.equal(r.touch, true); assert.ok(r.sx <= 0 && r.sy <= 0, JSON.stringify(r)); assert.ok(r.canvasBottom <= r.h); assert.ok(r.dpadVisible); assert.equal(r.rotate, 'none');
+  assert.equal(r.touch, true); assert.ok(r.sx <= 0 && r.sy <= 0, JSON.stringify(r)); assert.ok(r.canvasBottom <= r.h); assert.ok(r.dpadVisible); assert.equal(await page.evaluate(() => document.getElementById('view').width / 16), 25);
 }));
 
 test('holding the on-screen pad walks, and the buttons act', () => phone(async page => {
@@ -443,10 +443,31 @@ test('the menu drawer opens, pauses the world, and holds the side panels', () =>
   assert.deepEqual(r, { closed: true, open: true, frozen: true, tools: r.tools, resumed: true }); assert.ok(r.tools >= 4);
 }));
 
-test('portrait shows a rotate hint, and battle dialogs fit a short screen', async () => {
+test('held upright the map shows a tall slice, the pad sits below it, and turning the phone switches views', () => phone(async page => {
+  const look = () => page.evaluate(() => {
+    const cv = document.getElementById('view'), r = cv.getBoundingClientRect(), pad = document.getElementById('dpad').getBoundingClientRect(), act = document.getElementById('touch-actions').getBoundingClientRect();
+    return { cols: cv.width / 16, rows: cv.height / 16, left: Math.round(r.left), right: Math.round(r.right), bottom: Math.round(r.bottom), padTop: Math.round(pad.top), actTop: Math.round(act.top), w: innerWidth, h: innerHeight,
+      sx: document.documentElement.scrollWidth - innerWidth, sy: document.documentElement.scrollHeight - innerHeight, rotateHint: !!document.getElementById('rotate-hint') };
+  });
+  const up = await look();
+  assert.equal(up.cols, 15); assert.ok(up.rows >= 21 && up.rows <= 27 && up.rows % 2 === 1, 'rows ' + up.rows);
+  assert.ok(up.left <= 1 && up.right >= up.w - 1, 'the map should span the width ' + JSON.stringify(up));
+  assert.ok(up.bottom <= up.padTop && up.bottom <= up.actTop, 'the buttons must not cover the map ' + JSON.stringify(up));
+  assert.ok(up.sx <= 0 && up.sy <= 0 && !up.rotateHint, JSON.stringify(up));
+  // the player stays in the middle row and column of the slice, in the open and inside a settlement
+  const centre = await page.evaluate(() => { enterTown(); renderMap(); const [l, t] = townView(), [c, r] = viewSize(); return { cols: document.getElementById('view').width / 16, inside: state.x - l >= 0 && state.x - l < c && state.y - t >= 0 && state.y - t < r }; });
+  assert.deepEqual(centre, { cols: 15, inside: true });
+  await page.setViewportSize({ width: 915, height: 412 }); await page.waitForFunction(() => document.getElementById('view').width / 16 === 25);
+  assert.equal((await look()).rows, 15);
+  await page.setViewportSize({ width: 412, height: 915 }); await page.waitForFunction(() => document.getElementById('view').width / 16 === 15);
+  assert.ok((await look()).rows >= 21);
+}, { width: 390, height: 844 }));
+
+test('a dialog fits a portrait phone, and battle dialogs fit a short landscape screen', async () => {
   await phone(async page => {
-    assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('rotate-hint')).display), 'grid');
-  }, { width: 412, height: 915 });
+    const r = await page.evaluate(() => { openMap(); const d = document.getElementById('dialog').getBoundingClientRect(); return { top: d.top, bottom: d.bottom, left: d.left, right: d.right, h: innerHeight, w: innerWidth }; });
+    assert.ok(r.top >= 0 && r.bottom <= r.h && r.left >= 0 && r.right <= r.w, JSON.stringify(r));
+  }, { width: 390, height: 844 });
   await phone(async page => {
     const r = await page.evaluate(() => {
       manualPause = true; state.x = HOME.x + 12; state.y = HOME.y; const x = state.x + 1, y = state.y;

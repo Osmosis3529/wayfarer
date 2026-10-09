@@ -45,7 +45,7 @@ test('the hosted build ships every script the page loads, a valid manifest, real
   for (const src of [...index.matchAll(/<script[^>]+src="([^"]+)"/g)].map(m => m[1])) assert.ok(fs.existsSync(path.join(site, src)), 'missing ' + src);
   for (const game of ['gfx.js', 'settlement.js', 'war.js', 'dark.js', 'towns.js', 'touch.js', 'pwa.js']) assert.ok(index.includes('src="' + game + '"'), game + ' is not loaded');
   const manifest = JSON.parse(fs.readFileSync(path.join(site, 'manifest.webmanifest'), 'utf8'));
-  assert.equal(manifest.display, 'standalone'); assert.equal(manifest.orientation, 'landscape'); assert.equal(manifest.start_url, './'); assert.equal(manifest.scope, './');
+  assert.equal(manifest.display, 'standalone'); assert.equal(manifest.orientation, 'any'); assert.equal(manifest.start_url, './'); assert.equal(manifest.scope, './');
   assert.ok(manifest.name && manifest.short_name && manifest.background_color && manifest.theme_color);
   for (const icon of manifest.icons) { const [w, h] = pngSize(path.join(site, icon.src)); assert.equal(icon.sizes, w + 'x' + h); }
   assert.ok(manifest.icons.some(i => i.purpose === 'maskable' && i.sizes === '512x512') && manifest.icons.some(i => i.sizes === '192x192'));
@@ -84,6 +84,33 @@ test('the build is repeatable, and the Android build gets none of the web-app ex
   for (const f of ['gfx.js', 'settlement.js', 'war.js', 'dark.js', 'touch.js']) assert.ok(fs.existsSync(path.join(android, f)), f);
 });
 
+test('the Android app opens the hosted game and falls back to a bundled page that can retry it', () => {
+  const config = JSON.parse(fs.readFileSync(path.join(ROOT, 'capacitor.config.json'), 'utf8'));
+  // Capacitor wants server.url to be a bare origin (it is used as a WebView origin rule); the game's folder goes in appStartPath.
+  assert.match(config.server.url, /^https:\/\/[a-z0-9-]+\.github\.io$/); assert.equal(config.server.appStartPath, '/wayfarer/'); assert.notEqual(config.server.cleartext, true);
+  assert.equal(config.server.errorPath, 'offline.html');
+  const gameUrl = config.server.url + config.server.appStartPath;
+  assert.ok(fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8').includes(gameUrl), 'the README should name the address the app opens');
+  const android = path.join(tmp, 'android-shell'); build(android);
+  const offline = fs.readFileSync(path.join(android, config.server.errorPath), 'utf8');
+  assert.ok(offline.includes("location.replace('" + gameUrl + "')") && !offline.includes('__GAME_URL__'));
+  assert.ok(!fs.existsSync(path.join(site, 'offline.html')), 'the hosted copy does not need the Android error page');
+  const manifest = fs.readFileSync(path.join(ROOT, 'android', 'app', 'src', 'main', 'AndroidManifest.xml'), 'utf8');
+  assert.ok(manifest.includes('android:screenOrientation="fullUser"') && !/andscape/.test(manifest.replace(/<!--[\s\S]*?-->/g, '')), 'the app must be free to turn upright');
+});
+
+test('release builds take their key and version from the workflow, and the key never enters the repository', () => {
+  const gradle = fs.readFileSync(path.join(ROOT, 'android', 'app', 'build.gradle'), 'utf8');
+  for (const needle of ['WAYFARER_KEYSTORE', 'WAYFARER_KEYSTORE_PASSWORD', 'WAYFARER_KEY_ALIAS', 'WAYFARER_KEY_PASSWORD', 'wayfarerVersionCode', 'signingConfig signingConfigs.release']) assert.ok(gradle.includes(needle), needle);
+  const workflow = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'android.yml'), 'utf8'), readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
+  for (const secret of new Set(workflow.match(/secrets\.ANDROID_[A-Z_0-9]+/g).map(x => x.slice(8)))) assert.ok(readme.includes(secret), 'README does not explain ' + secret);
+  assert.ok(workflow.includes('-PwayfarerVersionCode=') && workflow.includes('gh release create') && workflow.includes("github.ref == 'refs/heads/main'"));
+  assert.ok(!/wayfarer\.html|gfx\.js|settlement\.js/.test(workflow.match(/paths:[\s\S]*?\njobs:/)[0]), 'game changes reach phones through the website and should not rebuild the APK');
+  const ignored = fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8'); for (const pattern of ['*.keystore', '*.jks']) assert.ok(ignored.includes(pattern), pattern);
+  const tracked = execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' }).split('\n');
+  assert.deepEqual(tracked.filter(f => /\.(keystore|jks|p12|pfx)$/i.test(f)), []);
+});
+
 test('the service worker caches the whole game, so it loads and plays with the network off', async () => {
   const { url } = await serve(site);
   await page({}, async (p, ctx) => {
@@ -115,6 +142,41 @@ test('a new deploy replaces the old cache and tells you to reload', async () => 
     await p.waitForFunction(async () => { const k = await caches.keys(); return k.length === 1 && k[0] === 'wayfarer-nextdeploy1'; }, null, { timeout: 15000 });
     await p.waitForFunction(() => state.log.some(l => l.t.includes('new version of Wayfarer')), null, { timeout: 15000 });
     assert.equal(first.length, 1); assert.notEqual(first[0], 'wayfarer-nextdeploy1');
+  });
+});
+
+test('an installed app switches to the new version when you come back to it, and keeps your place', async () => {
+  const dir = path.join(tmp, 'update-app'); build(dir, '--pwa');
+  const { url } = await serve(dir);
+  let n = 0;
+  const nativeApp = p => p.addInitScript(() => { window.Capacitor = { isNativePlatform: () => true, Plugins: {} }; });
+  const setHidden = (p, hidden) => p.evaluate(h => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => h }); document.dispatchEvent(new Event('visibilitychange')); }, hidden).catch(() => {});
+  // Starts a game, then publishes "a new deploy" and waits until the page has heard about it.
+  const withUpdate = async (p, message) => {
+    await p.goto(url + '?touch=1'); await p.waitForFunction(() => navigator.serviceWorker.controller);
+    await p.evaluate(() => { newWorld(); manualPause = true; state.coin = 77; window.__marker = 1; });
+    const swPath = path.join(dir, 'sw.js'); fs.writeFileSync(swPath, fs.readFileSync(swPath, 'utf8').replace(/VERSION = '[0-9a-z]+'/, "VERSION = 'deploy" + (++n) + "'"));
+    await p.evaluate(() => navigator.serviceWorker.getRegistration().then(r => r.update()));
+    await p.waitForFunction(m => state.log.some(l => l.t.includes(m)), message, { timeout: 15000 });
+  };
+  await page({ hasTouch: true }, async p => {                 // the Android app: the new version loads on return, where you were
+    await nativeApp(p);
+    await withUpdate(p, 'was downloaded');
+    await setHidden(p, true); await setHidden(p, false);
+    await p.waitForFunction(() => window.__marker === undefined && typeof state === 'object' && document.getElementById('start-screen').style.display === 'none', null, { timeout: 15000 });
+    assert.equal(await p.evaluate(() => state.coin), 77);
+  });
+  await page({ hasTouch: true }, async p => {                 // a fight cannot be saved, so it is left alone until next time
+    await nativeApp(p);
+    await withUpdate(p, 'was downloaded');
+    const kept = await p.evaluate(() => { state.combat = {}; for (const h of [true, false]) { Object.defineProperty(document, 'hidden', { configurable: true, get: () => h }); document.dispatchEvent(new Event('visibilitychange')); } const ok = window.__marker === 1; state.combat = null; return ok; });
+    await p.waitForTimeout(600);
+    assert.equal(kept, true); assert.equal(await p.evaluate(() => window.__marker), 1);
+  });
+  await page({ hasTouch: true }, async p => {                 // an ordinary browser tab keeps asking you to reload and never does it for you
+    await withUpdate(p, 'Reload the page');
+    await setHidden(p, true); await setHidden(p, false); await p.waitForTimeout(600);
+    assert.equal(await p.evaluate(() => window.__marker), 1);
   });
 });
 

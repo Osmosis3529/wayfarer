@@ -18,13 +18,33 @@
   // Installed web apps can ask the browser not to clear their saved worlds when space is short.
   if (standalone && navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 
+  // The Android app and an installed web app have no reload button, so they switch to a new version themselves.
+  const native = !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
+  const installed = standalone || native;
+  const started = () => document.getElementById('start-screen').style.display === 'none';
+  try {   // coming back after an update: pick up the autosave instead of showing the start screen
+    if (sessionStorage.getItem('wayfarer-resume')) { sessionStorage.removeItem('wayfarer-resume'); loadSavedWorld(AUTOSAVE_KEY); }
+  } catch (_) {}
+
   const secure = location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname);
   if ('serviceWorker' in navigator && secure) {
     let controlled = !!navigator.serviceWorker.controller;      // the first worker taking over is not an update
+    let updated = false;
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (controlled && typeof say === 'function') say('A new version of Wayfarer is ready. Reload the page to play it.', 'gold');
+      if (controlled) {
+        updated = true;
+        if (typeof say === 'function') say(installed ? 'A new version of Wayfarer was downloaded. It loads when you next come back to the app.' : 'A new version of Wayfarer is ready. Reload the page to play it.', 'gold');
+      }
       controlled = true;
+    });
+    // Reload when the player returns, after saving where they are. A fight in progress cannot be saved, so that one
+    // waits for the next time.
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden || !updated || !installed) return;
+      if (started() && state.combat) return;
+      if (started()) { try { autosave(); sessionStorage.setItem('wayfarer-resume', '1'); } catch (_) {} }
+      location.reload();
     });
   }
 })();

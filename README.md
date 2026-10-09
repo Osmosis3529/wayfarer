@@ -59,7 +59,7 @@ The game can also be hosted as a web app that installs to a phone's home screen,
 - **One-time setup:** in the repository's Settings → Pages, set *Build and deployment → Source* to **GitHub Actions** (not "Deploy from a branch": that publishes the README instead of the game). Then run the "Deploy web app" workflow from the Actions tab (or push to `main`). If you switched from the branch option, run the workflow once more afterwards, because the old branch publish can land after it and replace the game with the README. The address will be `https://<your-github-name>.github.io/<repository-name>/`.
 - **iPhone / iPad:** open the address in Safari, tap the Share button, then **Add to Home Screen**. **Android:** in Chrome, menu → *Install app*.
 - **Saves** are kept in the browser on that device. Installed apps are the safest place for them, but use **Export save** now and then: on a phone it opens the share sheet (Save to Files, AirDrop, ...), and **Load World from Save File** brings it back.
-- **Updates** download in the background after each deploy; the game says when a new version is ready and you reload to play it.
+- **Updates** download in the background after each deploy. In a browser tab the game says when a new version is ready and you reload to play it; an installed home-screen app or the Android app switches to it by itself the next time you come back to it, and keeps your place.
 - **Try it locally:** `npm run web:pwa` builds the hosted version into `site/`; serve that folder with any static web server (for example `python3 -m http.server -d site`) and open `http://localhost:8000`. Service workers only run on `localhost` or HTTPS.
 
 ## Troubleshooting
@@ -80,15 +80,37 @@ printf electron > node_modules/electron/path.txt
 
 ## Phone and tablet (Android)
 
-The game also runs on Android, in landscape, with an on-screen walking pad, an Interact (E) button, Eat, Pause and a menu button that slides out the log, pack and building panels. The touch controls switch on automatically on touch devices; add `?touch=1` to the page address to try them on a desktop browser.
+The game runs on Android in portrait or landscape (it follows the phone's auto-rotate setting). Held upright, the map shows a tall slice of the world with the walking pad, Interact (E), Eat, Pause and menu buttons underneath; sideways, the buttons float over a wider map. The menu button slides out the log, pack and building panels. The touch controls switch on automatically on touch devices; add `?touch=1` to the page address to try them on a desktop browser.
 
-The Android app is the same web game wrapped with [Capacitor](https://capacitorjs.com). To build an installable debug APK you need JDK 21 and the Android SDK (platform 36, build-tools 36):
+### How the app works
+
+The Android app is a thin shell ([Capacitor](https://capacitorjs.com)) that opens the hosted game at `https://osmosis3529.github.io/wayfarer/`, the same web app as above. That means **game updates reach phones without a new APK**: when a change is merged into `main`, the site redeploys, the app downloads the new version the next time it is open with a connection, and switches to it (keeping your place) the next time you come back to the app. After the first launch it also plays offline. Saves live inside the app on the phone, so use **Export save** now and then for a backup. The very first launch needs an internet connection; without one the app shows a "try again" page.
+
+A new APK is only needed when the shell itself changes (icon, permissions, the Android project, Capacitor). The "Android APK" workflow builds it.
+
+### Updating the Android app (signed releases)
+
+Android only installs an update over an existing app if both are signed with the same key and the new one has a higher version number. The workflow does both. One-time setup:
+
+1. Create a signing key (a file) and note its password. With JDK 21 installed:
+   `keytool -genkeypair -storetype PKCS12 -keystore wayfarer.keystore -alias wayfarer -keyalg RSA -keysize 2048 -validity 10000`
+   Use the **same password** when it asks for the key password too, and keep the alias `wayfarer`. **Back the file and password up somewhere safe and never commit them**: if they are lost, phones that already have the app must uninstall it before they can take an update.
+2. In the repository's Settings → Secrets and variables → Actions, add two repository secrets:
+   - `ANDROID_KEYSTORE_PASSWORD`: the password.
+   - `ANDROID_KEYSTORE_BASE64`: the key file as one line of text (`base64 -w0 wayfarer.keystore` on Linux, `base64 -i wayfarer.keystore` on a Mac).
+3. Run "Android APK" from the Actions tab (or merge a change to the Android project into `main`). On `main` it publishes the signed `wayfarer.apk` as a GitHub Release. On other branches it still builds the signed APK but only keeps it as a download on the run page. Each run's summary shows the key's fingerprint: it must be the same every time.
+
+To get updates on a phone without Google Play, install [Obtainium](https://github.com/ImranR98/Obtainium) (an open-source app that installs and updates apps straight from GitHub releases), choose *Add app*, and paste `https://github.com/Osmosis3529/wayfarer`. It checks for new releases and installs them (Android may ask you to confirm each install). Or download `wayfarer.apk` from the repository's Releases page and open it on the phone. The first signed APK cannot be installed over an older debug APK, because the key differs: export your save, uninstall the old app once, install the new one, and load your save.
+
+Without the secrets the workflow still builds a debug APK (signed with a throwaway key, so it cannot be installed over a release) as `wayfarer-debug-apk` on the run page, which is fine for quick tests of your own.
+
+### Building it yourself
+
+You need JDK 21 and the Android SDK (platform 36, build-tools 36):
 
 ```
 npm install
 npm run android:apk
 ```
 
-The APK appears at `android/app/build/outputs/apk/debug/app-debug.apk`. To install it, copy it to the phone, open it and allow installing from that source, or use `adb install`. A debug APK is fine for your own devices; Google Play would need a signed release build.
-
-You can also let GitHub build it: on the Actions tab, run "Android debug APK" and download the `wayfarer-debug-apk` artifact. The `android:sync` script (`npm run android:sync`) copies the latest game files into the Android project without building.
+The debug APK appears at `android/app/build/outputs/apk/debug/app-debug.apk`. To install it, copy it to the phone, open it and allow installing from that source, or use `adb install`. `npm run android:sync` copies the Android shell's files into the project without building. (To point the app at a different copy of the game, change `server.url` and `appStartPath` in `capacitor.config.json`.)
