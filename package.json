@@ -39,6 +39,7 @@
       "war.js",
       "dark.js",
       "towns.js",
+      "diplomacy.js",
       "touch.js",
       "assets/**/*",
       "icon.ico",

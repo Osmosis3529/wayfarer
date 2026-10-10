@@ -10,7 +10,7 @@ const root = path.join(__dirname, '..');
 const arg = name => { const i = process.argv.indexOf(name); return i < 0 ? null : (process.argv[i + 1] || ''); };
 const pwa = process.argv.includes('--pwa');
 const out = path.resolve(root, arg('--out') || 'www');
-const SCRIPTS = ['gfx.js', 'settlement.js', 'war.js', 'dark.js', 'towns.js', 'touch.js'];
+const SCRIPTS = ['gfx.js', 'settlement.js', 'war.js', 'dark.js', 'towns.js', 'diplomacy.js', 'touch.js'];
 
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(path.join(out, 'assets', 'kenney'), { recursive: true });

@@ -13,6 +13,7 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 // Every settlement gets a size and a temper; older worlds are filled in when they load.
 function ensureWarWorld() {
   if (!state.wars) state.wars = {};
+  for (const k of ['deals', 'hostile', 'aid', 'rel']) if (!state[k] || typeof state[k] !== 'object') state[k] = {};
   if (!Number.isFinite(state.escort)) state.escort = 0;
   for (const s of settlements) {
     if (!Number.isFinite(s.people)) s.people = 3 + Math.floor(Math.random() * 5);
@@ -20,6 +21,7 @@ function ensureWarWorld() {
     if (!Number.isFinite(s.aggression)) s.aggression = +(Math.random() * 0.5).toFixed(2);
     if (!('owner' in s)) s.owner = null;
   }
+  ensureRivalries();
 }
 function annexedCount() { return settlements.filter(s => s.owner === 'player').length; }
 function moodOf(s) { return s.aggression < 0.12 ? 'peaceful' : s.aggression < 0.3 ? 'wary' : 'hostile'; }
@@ -229,6 +231,7 @@ function annex(id) {
 }
 function noteKill(foe) {
   if (!foe) return;
+  if (!foe.faction) huntKill();
   if (foe.faction === 'war' && state.wars && state.wars[foe.townId]) {
     const w = state.wars[foe.townId]; w.left--;
     if (w.left <= 0) annex(foe.townId);

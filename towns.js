@@ -124,7 +124,6 @@ function npcBuilding(key) {
   else if (p.kind === 'well') npcWell(s);
   else houseDialog(s, p);
 }
-function relOf(id) { if (!state.rel) state.rel = {}; return state.rel[id] || (state.rel[id] = { favor: 0, done: 0, quest: null, wellDay: 0 }); }
 function npcCaravan(s) {
   showDialog('<h2>' + swatch(s.id) + esc(s.name) + ' caravan post</h2><p>Wagons come and go from here. Ride to any settlement you have visited, or look at the world map.</p><button onclick="openMap()">World map and fast travel</button><button onclick="closeDialog()">Leave</button>');
 }
@@ -191,12 +190,6 @@ function houseDialog(s, p) {
   const lines = ['The ' + family + ' family keeps a tidy home. Someone peers out and waves you on.', 'The door opens a crack: “Trading is at the market, and the inn will put you up. We keep to ourselves.”', 'Smoke curls from the chimney. The ' + family + 's are at supper and would rather not be disturbed.'];
   showDialog('<h2>' + esc(family) + ' home</h2><p>' + esc(lines[h % lines.length]) + '</p><button onclick="closeDialog()">Leave</button>');
 }
-function npcHallDialog(s) {
-  ensureWarWorld();
-  const w = state.wars[s.id], t = npcMap(), owner = ownerText(s);
-  showDialog('<h2>' + swatch(s.id) + esc(s.name) + '</h2><p><strong>' + SIZE_NAMES[t.bracket] + '</strong> · ' + s.people + ' citizens · ' + moodOf(s) + (owner ? ' · ' + esc(owner) : '') + '</p><p>' + esc(regionNote(s) || '') + '</p>' +
-    (w ? '' : warButton(s.id) || '<p>You need a barracks in Brackenford before you can wage war.</p>') + '<button onclick="closeDialog()">Leave</button>');
-}
 const VISITOR_TALK = {
   villager: ['Welcome, traveler. The market has what we have.', 'Mind the road at night; it has been a restless season.', 'We make do with what the fields give us.', 'The inn keeps a good fire.'],
   guard: ['Keep the peace and you are welcome here.', 'We watch the road. Someone should.', 'Trouble finds this town now and then. We are ready for it.']
@@ -220,6 +213,7 @@ function renderVisitPanel() {
     '<div class="town-metric">Size<b>' + SIZE_NAMES[t.bracket] + '</b></div>' +
     '<div class="town-metric">Citizens<b>' + s.people + '</b></div>' +
     '<div class="town-metric">Mood<b>' + moodOf(s) + '</b></div>' +
+    '<div class="town-metric">Standing<b>' + standingText(s) + '</b></div>' +
     '<div class="town-metric">Distance<b>' + Math.round(Math.hypot(s.x - HOME.x, s.y - HOME.y)) + ' leagues</b></div>' +
     '<div class="town-metric">Ruler<b>' + esc(owner || 'its own people') + '</b></div>';
   const uses = { market: 'trade goods', inn: 'rest for coin', travel: 'world map and fast travel', hall: 'news and war', well: 'free healing', huntersLodge: 'furs and game', smithy: 'weapons and armor', jeweler: 'gems, silver and gold', mine: 'stone and ore' };

@@ -481,9 +481,6 @@ function longhouseDialog() {
   const tier = state.town.tier || 1;
   showDialog('<h2>' + esc(bld('longhouse')) + '</h2><p>The longhouse is where the settlement sleeps. It houses up to <strong>' + [12, 24, 36][tier - 1] + '</strong> citizens as a ' + TIER_NAMES[tier] + ' (24 as a Town, 36 as a City) and does nothing else: jobs and upgrades are run from the ' + esc(hallName().toLowerCase()) + '.</p><p>' + state.town.people + ' / ' + housingCap() + ' citizens live here · growth: <strong>' + esc(growthLabel()) + '</strong>.</p><button onclick="closeDialog()">Leave</button>');
 }
-function caravanDialog(key) {
-  showDialog('<h2>' + esc(bld(key)) + '</h2>' + staffBlock(key) + '<p>Caravans run your trade deals. Strike one by earning a settlement’s trust.</p><button onclick="closeDialog()">Leave</button>');
-}
 function hallRest() { state.hp = state.maxHp; say('You rest in the ' + hallName().toLowerCase() + ' and recover all hearts.', 'gold'); render(); closeDialog(); }
 function upgradesDialog() {
   ensureSettlementState();
