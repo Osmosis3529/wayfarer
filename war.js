@@ -349,7 +349,7 @@ function worldTurn() {
   for (const s of free) {
     if (Math.random() >= s.aggression * RAID_RATE) continue;
     const others = settlements.filter(t => t !== s && t.owner !== 'player' && t.owner !== s.id && Math.hypot(t.x - s.x, t.y - s.y) <= 60);
-    const canRaidPlayer = !state.raid && state.built.hut && Math.hypot(s.x - HOME.x, s.y - HOME.y) <= 100;
+    const canRaidPlayer = !state.raid && (state.built.hut || state.built.longhouse) && Math.hypot(s.x - HOME.x, s.y - HOME.y) <= 100;
     if (canRaidPlayer && (!others.length || Math.random() < .5)) startRaid(s);
     else if (others.length) npcConflict(s, others[Math.floor(Math.random() * others.length)]);
   }

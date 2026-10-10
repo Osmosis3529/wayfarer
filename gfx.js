@@ -32,7 +32,7 @@ const P={
  stairR:['...y....','...yy...','yyyyyy..','yyyyyyy.','yyyyyy..','...yy...','...y....','........']
 };
 for(const r of Object.values(P))if(r.length!==8||r.some(x=>x.length!==8))throw new Error('bad sprite');
-const HOUSES={market:['#c9a227','#3a6f9c'],smithy:['#444b50','#ff7a2b'],huntersLodge:['#3b7a3b','#e0b894'],jeweler:['#8a5fb0','#f0a0ff'],lumberMill:['#8a5a2b','#d9a066'],mine:['#6a6f73','#111111'],tannery:['#c0642a','#e8c9a0'],fishingHut:['#3a6f9c','#9ad0f0'],barracks:['#7d2a24','#cfd6dc']};
+const HOUSES={market:['#c9a227','#3a6f9c'],smithy:['#444b50','#ff7a2b'],huntersLodge:['#3b7a3b','#e0b894'],jeweler:['#8a5fb0','#f0a0ff'],lumberMill:['#8a5a2b','#d9a066'],mine:['#6a6f73','#111111'],caravanPost:['#7a5a33','#df4a3a'],longhouse:['#7a4a2b','#e5bd69'],fishingHut:['#3a6f9c','#9ad0f0'],barracks:['#7d2a24','#cfd6dc']};
 const ORES={c:'#d9822b',i:'#5a7fa8',s:'#ffffff',a:'#f3d44a','◆':'#c46bf0'};
 const ENEMY_ART={
  beast:['X.X.....','XXX....X','XEXXXXXX','.XXXXXXX','..XXXXXx','..X.X.X.','..x.x.x.','........'],
@@ -100,7 +100,7 @@ function tint(ctx,w,h,a){if(a<=0)return;ctx.fillStyle='rgba(10,20,60,'+a.toFixed
 // Entries are [sheet, column, row]. Anything not listed keeps the handmade art.
 const SKIN_TILES={tree:['rpg',13,9],tree_spent:['rpg',22,10],rock:['rpg',54,21],rock_spent:['rpg',56,22],berry:['rpg',24,9],berry_spent:['rpg',19,9],chest:['rpg',37,9],enemy:['chars',0,3],foe:['chars',0,8],player:['chars',0,7],worker:['chars',0,5],soldier:['chars',0,11],
  home:['rpg',32,0],town:['rpg',33,0],cave:['rpg',40,8],dungeon:['rpg',42,9],keep:['rpg',44,9],mine:['rpg',36,1],stairL:['rpg',50,25],stairR:['rpg',51,25],ore_spent:['rpg',54,20],
- b_market:['rpg',10,0],b_garden:['rpg',22,11],b_well:['rpg',24,0],b_smithy:['rpg',15,0],b_huntersLodge:['rpg',48,10],b_jeweler:['rpg',43,11],b_lumberMill:['rpg',53,21],b_mine:['rpg',49,21],b_tannery:['rpg',51,12],b_fishingHut:['rpg',53,18],b_warehouse:['rpg',46,10],b_barracks:['rpg',50,0],b_beacon:['rpg',18,8]};
+ b_market:['rpg',10,0],b_garden:['rpg',22,11],b_well:['rpg',24,0],b_smithy:['rpg',15,0],b_huntersLodge:['rpg',48,10],b_jeweler:['rpg',43,11],b_lumberMill:['rpg',53,21],b_mine:['rpg',49,21],b_caravanPost:['rpg',51,12],b_longhouse:['rpg',32,0],b_fishingHut:['rpg',53,18],b_warehouse:['rpg',46,10],b_barracks:['rpg',50,0],b_beacon:['rpg',18,8]};
 const SKIN_WORKERS=[[0,5],[1,5],[0,6],[1,6],[0,7],[1,7],[0,9],[1,9]];
 const SKIN_ORES={c:'#d9822b',i:'#7fb2d8',s:'#ffffff',a:'#f3d44a','◆':'#c46bf0'};
 const SKIN_PORTRAITS={'Roadside Bandit':['chars',0,8],'Kobold Delver':['chars',1,3],'Grave Cultist':['chars',1,10],'Moss Troll':['chars',0,3],'Crypt Ogre':['chars',1,8],'Forgotten Warden':['chars',0,11],'The Hollow King':['chars',1,10],'Restless Skeleton':['chars',1,11],'Barrow Ghoul':['chars',1,3]};
@@ -178,7 +178,8 @@ function plotArt(key,built,tier,w,h,doorCol){
  if(key==='barracks'){R('#6b4a2b',W/2-1,0,2,roofH-2);R('#df4a3a',W/2+1,1,10,6);R('#ffffff',W/2+3,3,3,2)}
  if(key==='jeweler'){R('#f0a0ff',W/2-5,roofH/2-5,10,10);R('#ffffff',W/2-3,roofH/2-3,3,3);R('#8a5fb0',W/2-1,roofH/2+1,4,4)}
  if(key==='lumberMill'){for(let i=0;i<3;i++)R(i%2?'#d9a066':'#9a6c3f',W-14,H-8-i*4,12,3)}
- if(key==='tannery'){R('#e8c9a0',3,wallY-6,8,10);R('#c0803a',W-12,wallY-6,8,10)}
+ if(key==='caravanPost'){R('#6b4a2b',4,H-10,12,7);R('#cfd6dc',6,H-5,3,3);R('#cfd6dc',12,H-5,3,3);R('#e8c9a0',5,H-14,10,4);R('#df4a3a',W-9,2,7,5)}
+ if(key==='longhouse'){R('#5a3a1f',0,roofH/2-1,W,2);R('#6b6b66',W-9,0,5,roofH-6);R('#cfd6dc',W-8,0,3,2);for(let i=3;i<W-12;i+=7)R('#e5bd69',i,wallY+4,3,3)}
  if(key==='fishingHut'){R('#9ad0f0',3,wallY-4,12,2);R('#7fb2d8',5,wallY-2,8,2);R('#e0b894',W-10,wallY-6,2,8)}
  if(key==='huntersLodge'){R('#e0b894',W/2-5,roofH-10,10,4);R('#6b4a2b',W/2-6,roofH-12,2,6);R('#6b4a2b',W/2+4,roofH-12,2,6)}
  if(key==='warehouse'){R('#9a6c3f',4,H-9,9,7);R('#c9a227',4,H-9,9,1);R('#7a5a33',W-14,H-12,10,10);R('#c9a227',W-14,H-12,10,1);R('#c9a227',W-10,H-12,1,10)}

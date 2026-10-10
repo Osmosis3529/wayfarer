@@ -108,7 +108,7 @@ function burnTorch() {
 function lightTorch() {
   if (state.combat) return;
   if (!isDark()) { say('There is no need for a torch out in the open.'); return; }
-  if (!(state.inv.torch > 0)) { say('You have no torches. The trading post and the lumber mill sell them, and caches in the dark sometimes hold one.', 'alert'); return; }
+  if (!(state.inv.torch > 0)) { say('You have no torches. The market and the lumber mill sell them, and caches in the dark sometimes hold one.', 'alert'); return; }
   state.inv.torch--;
   state.torch = (state.torch || 0) + TORCH_STEPS;
   say('You light a torch. It will burn for ' + state.torch + ' steps and throws light much farther.', 'gold');

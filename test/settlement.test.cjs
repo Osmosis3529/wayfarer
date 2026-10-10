@@ -24,7 +24,7 @@ async function game(fn) {
       state.unlocked = { smithy: true, huntersLodge: true, jeweler: true };
       state.coin = 500; state.town.people = 40;
     };
-    window.BUILD_ALL = () => { RICH(); for (const k of ['hut', 'market', 'garden', 'well', 'smithy', 'huntersLodge', 'jeweler', 'lumberMill', 'mine', 'tannery', 'fishingHut', 'warehouse', 'barracks']) build(k); };
+    window.BUILD_ALL = () => { RICH(); for (const k of ['hut', 'longhouse', 'market', 'garden', 'well', 'smithy', 'huntersLodge', 'jeweler', 'lumberMill', 'mine', 'caravanPost', 'fishingHut', 'warehouse', 'barracks']) build(k); };
     window.dialogText = () => document.getElementById('dialog').textContent;
     window.dialogOpen = () => document.getElementById('overlay').style.display === 'grid';
   });
@@ -117,7 +117,7 @@ test('the hall dialog opens the job list, and its buttons change the crews', () 
     plus.click();
     return { hall, jobs, crew: crew('lumberMill'), still: dialogOpen() };
   });
-  assert.ok(r.hall.includes('Longhouse') && r.hall.includes('Settlement upgrades') && r.hall.includes('Citizens and jobs'), r.hall);
+  assert.ok(r.hall.includes('Hall') && !r.hall.includes('Longhouse') && r.hall.includes('Settlement upgrades') && r.hall.includes('Citizens and jobs'), r.hall);
   assert.ok(r.jobs.includes('Lumber mill') && r.jobs.includes('Lumberjack'), r.jobs);
   assert.equal(r.crew, 2); assert.equal(r.still, true);
 }));
@@ -173,19 +173,19 @@ test('an upgrade you cannot afford is refused, and an unbuilt building has none'
 
 test('buildings hold more workers and the housing limit grows with each tier', () => game(async page => {
   const r = await page.evaluate(() => {
-    RICH(); build('lumberMill'); build('market'); build('hut');
-    const out = { t1: [capacity('lumberMill'), capacity('market'), housingCap()] };
+    RICH(); build('lumberMill'); build('market'); build('hut'); const hallOnly = housingCap(); build('longhouse');
+    const out = { hallOnly, t1: [capacity('lumberMill'), capacity('market'), housingCap()] };
     state.town.tier = 2; out.t2 = [capacity('lumberMill'), capacity('market'), housingCap()];
     state.town.tier = 3; out.t3 = [capacity('lumberMill'), capacity('market'), housingCap()];
-    state.town.tier = 1; state.built.hut = false; out.noHut = housingCap();
+    state.town.tier = 1; state.built.longhouse = false; out.noLonghouse = housingCap();
     return out;
   });
-  assert.deepEqual(r.t1, [2, 1, 12]); assert.deepEqual(r.t2, [4, 2, 24]); assert.deepEqual(r.t3, [6, 3, 36]); assert.equal(r.noHut, 2);
+  assert.deepEqual(r.t1, [2, 1, 12]); assert.deepEqual(r.t2, [4, 2, 24]); assert.deepEqual(r.t3, [6, 3, 36]); assert.equal(r.noLonghouse, 2); assert.equal(r.hallOnly, 2, 'only the longhouse houses people');
 }));
 
 test('newcomers follow the pantry: none when it is thin, the odd one when it is comfortable, one or two a day when it is full', () => game(async page => {
   const r = await page.evaluate(() => {
-    RICH(); build('hut');
+    RICH(); build('longhouse');
     const day = (people, meals, roll) => {                       // meals are the ones in the pantry before the day's eating
       state.town.people = people; state.town.food = meals; state.starving = false;
       const real = Math.random; Math.random = () => roll;
@@ -194,16 +194,16 @@ test('newcomers follow the pantry: none when it is thin, the odd one when it is 
     const out = { thin: day(4, 5, 0), slowLucky: day(4, 16, 0.1), slowUnlucky: day(4, 16, 0.9), steady: day(4, 24, 0.99), fast: day(4, 40, 0.99) };
     out.capped = day(housingCap() - 1, 999, 0.99);
     out.full = day(housingCap(), 999, 0.99);
-    state.built.hut = false; out.noHall = day(4, 40, 0.99);
+    state.built.longhouse = false; out.noLonghouse = day(4, 40, 0.99);
     return out;
   });
-  assert.deepEqual(r, { thin: 0, slowLucky: 1, slowUnlucky: 0, steady: 1, fast: 2, capped: 1, full: 0, noHall: 0 });
+  assert.deepEqual(r, { thin: 0, slowLucky: 1, slowUnlucky: 0, steady: 1, fast: 2, capped: 1, full: 0, noLonghouse: 0 });
 }));
 
 test('the growth forecast follows the pantry and the housing', () => game(async page => {
   const r = await page.evaluate(() => {
-    RICH(); const out = { noHall: growthLabel() };
-    build('hut'); state.town.people = 4;
+    RICH(); const out = { noLonghouse: growthLabel() };
+    build('hut'); build('longhouse'); state.town.people = 4;
     const at = meals => { state.town.food = meals; return growthLabel(); };
     out.thin = at(5); out.slow = at(12); out.steady = at(20); out.fast = at(40);
     state.town.people = housingCap(); out.full = at(999);
@@ -211,7 +211,7 @@ test('the growth forecast follows the pantry and the housing', () => game(async 
     state.starving = false; state.town.food = 40; renderTown(); out.panel = document.getElementById('town-stats').textContent;
     return out;
   });
-  assert.equal(r.noHall, 'needs a longhouse'); assert.ok(r.thin.startsWith('none')); assert.equal(r.slow, 'slow'); assert.equal(r.steady, 'steady'); assert.equal(r.fast, 'fast');
+  assert.equal(r.noLonghouse, 'needs a longhouse'); assert.ok(r.thin.startsWith('none')); assert.equal(r.slow, 'slow'); assert.equal(r.steady, 'steady'); assert.equal(r.fast, 'fast');
   assert.equal(r.full, 'housing full'); assert.equal(r.starving, 'starving'); assert.ok(r.panel.includes('Growth') && r.panel.includes('fast'), r.panel);
 }));
 
@@ -220,17 +220,18 @@ test('a working building needs a free citizen: you can only build while citizens
     RICH(); state.town.people = 3;
     build('market'); build('garden'); build('lumberMill');          // 3 citizens: room for the first three
     const three = staffedBuildings();
-    build('tannery'); const blocked = !!state.built.tannery;
-    buildPrompt('tannery'); const prompt = dialogText(), button = [...document.querySelectorAll('#dialog button')].some(b => b.textContent.startsWith('Build')); closeDialog();
+    build('caravanPost'); const blocked = !!state.built.caravanPost;
+    buildPrompt('caravanPost'); const prompt = dialogText(), button = [...document.querySelectorAll('#dialog button')].some(b => b.textContent.startsWith('Build')); closeDialog();
     build('hut'); const hut = !!state.built.hut;                     // the hall never needs staff
+    build('longhouse'); const longhouse = !!state.built.longhouse;   // nor does the longhouse
     build('well'); const well = !!state.built.well;                  // neither does the well
-    state.town.people = 4; build('tannery'); const fourth = !!state.built.tannery;
+    state.town.people = 4; build('caravanPost'); const fourth = !!state.built.caravanPost;
     buildPrompt('fishingHut'); const stillFull = dialogText(); closeDialog();
     state.town.people = 5; buildPrompt('fishingHut'); const open = [...document.querySelectorAll('#dialog button')].some(b => b.textContent.startsWith('Build'));
-    return { three, blocked, prompt, button, hut, well, fourth, stillFull, open, crews: employed() };
+    return { three, blocked, prompt, button, hut, longhouse, well, fourth, stillFull, open, crews: employed() };
   });
   assert.equal(r.three, 3); assert.equal(r.blocked, false); assert.ok(r.prompt.includes('Nobody is free'), r.prompt); assert.equal(r.button, false);
-  assert.equal(r.hut, true); assert.equal(r.well, true); assert.equal(r.fourth, true); assert.ok(r.stillFull.includes('Nobody is free'), r.stillFull); assert.equal(r.open, true);
+  assert.equal(r.hut, true); assert.equal(r.longhouse, true); assert.equal(r.well, true); assert.equal(r.fourth, true); assert.ok(r.stillFull.includes('Nobody is free'), r.stillFull); assert.equal(r.open, true);
 }));
 
 test('upgrades need one citizen per building in a Village, two in a Town and three in a City', () => game(async page => {
@@ -418,7 +419,7 @@ test('both renderers draw the settlement, its people and the player', () => game
   });
   assert.equal(r.gfx, true);
   assert.deepEqual(r.text, { player: true, door: true, people: true, gate: true });
-  assert.ok(r.sidebar.includes('Longhouse') && r.sidebar.includes('Citizens') && r.sidebar.includes('upgrades'), r.sidebar);
+  assert.ok(r.sidebar.includes('Hall') && r.sidebar.includes('Citizens') && r.sidebar.includes('upgrades'), r.sidebar);
 }));
 
 test('the world clock keeps running in town: citizens walk and the day advances', () => game(async page => {
@@ -446,9 +447,9 @@ test('the hunting camp is gone, the gem hall is the jeweler, and the warehouse i
 
 test('the mine brings copper, iron and stone; the jeweler brings silver, gold and gems; the lodge brings meals and furs', () => game(async page => {
   const r = await page.evaluate(() => {
-    RICH(); build('mine'); build('jeweler'); build('huntersLodge'); build('tannery'); state.town.people = 40; state.town.food = 40;
+    RICH(); build('mine'); build('jeweler'); build('huntersLodge'); state.town.people = 40; state.town.food = 40;
     const seen = { mine: new Set(), jeweler: new Set() }, before = () => ({ ...state.inv });
-    state.assign.mine = 2; state.assign.jeweler = 2; state.assign.huntersLodge = 2; state.assign.tannery = 0;
+    state.assign.mine = 2; state.assign.jeweler = 2; state.assign.huntersLodge = 2;
     for (let i = 0; i < 40; i++) {
       for (const k of Object.keys(state.inv)) state.inv[k] = 0;
       state.town.food = 40; const food = state.town.food;
@@ -529,4 +530,37 @@ test('saves from before the warehouse and the jeweler are converted, including t
   });
   assert.deepEqual(r.built, [true, true, false, false]); assert.deepEqual(r.unlocked, [true, false]);
   assert.deepEqual(r.assign, [2, 1, false, false]); assert.deepEqual(r.up, [[true, false, false], [true, true, false]]);
+}));
+
+test('the old tannery becomes a caravan post, and a built hall brings the longhouse that used to be part of it', () => game(async page => {
+  const r = await page.evaluate(() => {
+    RICH(); build('hut'); build('longhouse'); build('market'); state.town.people = 6;
+    const old = JSON.parse(JSON.stringify(buildSaveData()));
+    // what a save from before this change looks like
+    for (const o of [old.state.built]) { delete o.longhouse; delete o.caravanPost; o.tannery = true; }
+    old.state.assign.tannery = 1; old.state.up.tannery = [true, false, false];
+    hydrateWorld(old);
+    const migrated = { caravan: state.built.caravanPost, tannery: 'tannery' in state.built, crew: crew('caravanPost'), up: state.up.caravanPost, longhouse: state.built.longhouse, cap: housingCap() };
+    const noHall = JSON.parse(JSON.stringify(buildSaveData())); noHall.state.built.hut = false; delete noHall.state.built.longhouse;
+    hydrateWorld(noHall);
+    return { migrated, bare: state.built.longhouse };
+  });
+  assert.deepEqual(r.migrated, { caravan: true, tannery: false, crew: 1, up: [true, false, false], longhouse: true, cap: 12 });
+  assert.equal(r.bare, false);
+}));
+
+test('the market, longhouse and caravan post are on the settlement map, with costs and names', () => game(async page => {
+  const r = await page.evaluate(() => {
+    enterTown(); closeDialog();
+    const names = { market: BUILDING_NAMES.market, longhouse: BUILDING_NAMES.longhouse, caravanPost: BUILDING_NAMES.caravanPost, hall: buildingName('hut') };
+    const plots = ['longhouse', 'caravanPost'].map(k => [k, !!TOWN_PLOTS[k], !!BUILD_COSTS[k], !!BUILDING_MARKS.find(b => b.key === k), 'tannery' in TOWN_PLOTS]);
+    state.x = 17; state.y = 19; move(0, -1); const prompt = dialogText(); closeDialog();     // the longhouse door
+    RICH(); state.town.people = 8; build('market'); trade('home'); const shop = dialogText(); closeDialog();
+    return { names, plots, prompt, shop, text: document.getElementById('town-hint').textContent };
+  });
+  assert.deepEqual(r.names, { market: 'Market', longhouse: 'Longhouse', caravanPost: 'Caravan post', hall: 'Hall' });
+  assert.deepEqual(r.plots, [['longhouse', true, true, true, false], ['caravanPost', true, true, true, false]]);
+  assert.ok(r.prompt.includes('Empty plot') && r.prompt.includes('longhouse'), r.prompt);
+  assert.ok(r.shop.includes('Mara’s Market') && !/trading post/i.test(r.shop), r.shop);
+  assert.ok(r.text.includes('longhouse'), r.text);
 }));
