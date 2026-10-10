@@ -131,7 +131,7 @@ function makeHostile(t, via) {
 }
 function reconcileHostility() {
   for (const [id, h] of Object.entries(state.hostile || {})) {
-    if (h.via && isAlly(h.via)) continue;
+    if (!h.via || isAlly(h.via)) continue;          // a war you started (no 'via') lasts until it is settled
     delete state.hostile[id];
     say((townById(id) || { name: 'A settlement' }).name + ' calls off its war against Brackenford.', 'gold');
   }
@@ -235,5 +235,6 @@ function journal() {
   }).join('') || '<p>No jobs taken. Ask at the hall of any settlement you visit.</p>';
   const ally = allies().map(s => '<div class="up-row"><span>' + swatch(s.id) + esc(s.name) + '<br><em>' + (state.deals[s.id].trips) + ' caravan trips</em></span></div>').join('') || '<p>No allies yet.</p>';
   const foes = Object.keys(state.hostile || {}).map(id => { const s = townById(id); return s ? '<div class="up-row"><span>' + swatch(id) + esc(s.name) + '<br><em>at war with you since day ' + state.hostile[id].since + '</em></span></div>' : ''; }).join('') || '<p>Nobody is at war with you.</p>';
-  showDialog('<h2>Journal</h2><h3>Jobs</h3>' + jobs + '<h3>Allies</h3>' + ally + '<h3>Enemies</h3>' + foes + '<button onclick="closeDialog()">Close</button>');
+  const calls = aidRows();
+  showDialog('<h2>Journal</h2><h3>Jobs</h3>' + jobs + '<h3>Allies</h3>' + ally + (calls ? '<h3>Allies asking for help</h3>' + calls : '') + '<h3>Enemies</h3>' + foes + '<h3>Wars between settlements</h3>' + npcWarRows() + '<button onclick="closeDialog()">Close</button>');
 }

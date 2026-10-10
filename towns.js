@@ -57,8 +57,9 @@ function buildNpcTown(s) {
   for (const [k, from] of NPC_EXTRAS) if (b >= from) kinds.push(k);
   const houses = Math.min(slots.length - kinds.length, Math.ceil(s.people * 0.9));
   for (let i = 0; i < houses; i++) kinds.push('house');
-  const plots = {};
+  const plots = {}, standing = Math.max(0, kinds.length - Math.floor(s.wreck || 0));    // war and fire take the last ones first
   kinds.forEach((kind, i) => {
+    if (i >= standing) return;
     const p = slots[i], key = 'p' + i, variant = ['house', 'house2', 'house3'][Math.floor(rnd() * 3)];
     rect(p.x0, p.y0 - 0, p.x1, p.y1, '▣'); g[p.y1][p.x0 + 2] = '▤';
     plots[key] = { ...p, door: [p.x0 + 2, p.y1], front: [p.x0 + 2, p.y1 + 1], kind, art: kind === 'hall' ? 'hut' : kind === 'house' ? variant : kind, tier: kind === 'hall' ? Math.min(3, b + 1) : 1, name: kind === 'hall' ? HALL_TITLES[b] : NPC_KIND_NAMES[kind] };
@@ -85,7 +86,7 @@ function syncNpcPeople() {
   townPeople = [];
   for (let i = 0; i < total; i++) {
     const guard = i < guards, home = guard ? t.patrol[i % 4] : homes.length ? homes[i % homes.length].front : spot();
-    const targets = guard ? t.patrol.map((_, k) => t.patrol[(k + i) % 4]) : [home, spot(), (i % 2 ? market : inn).front];
+    const stop = (i % 2 ? market : inn) || market || inn, targets = guard ? t.patrol.map((_, k) => t.patrol[(k + i) % 4]) : [home, spot(), stop ? stop.front : spot()];
     const [x, y] = freeSpotNear(home[0], home[1], taken); taken.add(x + ',' + y);
     townPeople.push({ id: 'c' + i, town: t.id, name: personName(i + (strHash(s.id) % 40)), job: guard ? 'guard' : 'villager', idx: i, x, y, targets, ti: 0, path: [], wait: Math.floor(rnd() * 4) });
   }
@@ -100,7 +101,7 @@ function enterSettlement(id, quiet) {
   const s = townById(id);
   if (!s) return;
   ensureWarWorld();
-  if (state.wars[id]) { warDialog(id); return; }
+  if (state.wars[id]) { if (state.wars[id].cleared) annex(id); else { warDialog(id); return; } }
   state.visiting = id; state.visited[id] = true; npcCurrent = null; townPeople = []; townPathCache.clear();
   state.zone = 'town'; state.site = null; state.returnPoint = null; state.view = 'explore';
   const t = npcMap(); map = t.grid; state.x = t.start[0]; state.y = t.start[1];

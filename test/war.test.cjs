@@ -155,7 +155,7 @@ test('calling every citizen to arms fills the barracks, and standing down restor
   assert.deepEqual(r.after, r.before); assert.equal(r.backup, null);
 }));
 
-test('declaring war needs a known settlement and a barracks, and fills the field with defenders', () => game(async page => {
+test('declaring war needs a known settlement and a barracks, and fills the field with defenders and fortified houses', () => game(async page => {
   const r = await page.evaluate(() => {
     ensureWarWorld(); const s = target(0); s.discovered = false;
     const unknown = declareWar(s.id); s.discovered = true;
@@ -163,11 +163,12 @@ test('declaring war needs a known settlement and a barracks, and fills the field
     army(3, 10);
     const ok = declareWar(s.id), again = declareWar(s.id);
     const foes = foeBox().filter(f => f.e.townId === s.id), w = state.wars[s.id];
-    return { unknown, noBarracks, ok, again, count: foes.length, total: w.total, left: w.left, people: s.people, captains: foes.filter(f => f.e.name === 'Town Captain').length, guards: foes.filter(f => f.e.name === 'Town Guard').length, near: foes.every(f => Math.hypot(f.x - s.x, f.y - s.y) <= 5.6), leashed: foes.every(f => f.e.leash && f.e.leash.x === s.x && f.e.faction === 'war') };
+    return { unknown, noBarracks, ok, again, count: foes.length, total: w.total, left: w.left, guardsLeft: w.guards, holdsLeft: w.holds, size: w.size, people: s.people, captains: foes.filter(f => f.e.name === 'Town Captain').length, guards: foes.filter(f => f.e.name === 'Town Guard').length, houses: foes.filter(f => f.e.building).length, near: foes.every(f => Math.hypot(f.x - s.x, f.y - s.y) <= 5.6), leashed: foes.filter(f => !f.e.building).every(f => f.e.leash && f.e.leash.x === s.x && f.e.faction === 'war'), hostile: !!state.hostile[s.id], bracket: townBracket(Math.max(2, s.people)) };
   });
   assert.equal(r.unknown, false); assert.equal(r.noBarracks, false); assert.equal(r.ok, true); assert.equal(r.again, false);
-  assert.equal(r.count, r.total); assert.equal(r.left, r.total); assert.ok(r.total >= Math.max(2, r.people) - 1 && r.total <= Math.max(2, r.people));
-  assert.equal(r.captains, 1); assert.equal(r.guards, r.total - 1); assert.equal(r.near, true); assert.equal(r.leashed, true);
+  assert.equal(r.count, r.total); assert.equal(r.left, r.total); assert.equal(r.total, r.guardsLeft + r.holdsLeft);
+  assert.ok(r.guardsLeft >= r.size - 1 && r.guardsLeft <= r.size); assert.equal(r.holdsLeft, 2 + r.bracket); assert.equal(r.houses, r.holdsLeft);
+  assert.equal(r.captains, 1); assert.equal(r.guards, r.guardsLeft - 1); assert.equal(r.near, true); assert.equal(r.leashed, true); assert.equal(r.hostile, true);
 }));
 
 test('defenders keep to their town, but chase you when you get close', () => game(async page => {
@@ -193,25 +194,34 @@ test('merchants shut their gates while you are at war', () => game(async page =>
   assert.ok(r.war.includes('at war') && r.war.includes('defenders') && !r.war.includes('Buy'), r.war);
 }));
 
-test('beating every defender annexes the settlement for plunder, citizens, housing and a daily tribute', () => game(async page => {
+test('a siege: every defender and building must fall, the gates stay shut until then, and walking in claims the settlement', () => game(async page => {
   const r = await page.evaluate(() => {
-    army(4, 10); build('hut'); const s = target(0); const before = { coin: state.coin, people: state.town.people, cap: housingCap(), name: s.name, size: s.people };
+    army(4, 10); build('hut'); const s = target(0); const before = { coin: state.coin, size: s.people };
     declareWar(s.id);
-    const foes = foeBox().filter(f => f.e.townId === s.id);
-    // the first through real combat, the rest through the same bookkeeping soldiers and fights use
-    const [f0, ...rest] = foes; state.x = f0.x - 1; state.y = f0.y; clearRect(state.x, state.y, state.x, state.y);
-    startCombat(f0.x, f0.y, state.x, state.y); state.combat.hp = 1; battleAction('attack');
-    const midway = state.wars[s.id] ? state.wars[s.id].left : -1;
+    const foes = foeBox().filter(f => f.e.townId === s.id), houses = foes.filter(f => f.e.building), guards = foes.filter(f => !f.e.building);
+    // the gates are shut, and houses neither walk nor ambush
+    state.x = s.x; state.y = s.y; closeDialog(); enterSettlement(s.id); const shut = { zone: state.zone, dialog: dialogText().includes('gates are shut') }; closeDialog();
+    const spots = houses.map(h => h.k).sort().join(); state.x = HOME.x + 10; state.y = HOME.y;
+    for (let i = 0; i < 8; i++) moveEnemies(); const still = foeBox().filter(f => f.e.building).map(f => f.k).sort().join() === spots;
+    // a house is fought by walking into it, in the ordinary battle
+    const h0 = houses[0]; state.x = h0.x - 1; state.y = h0.y; clearRect(state.x, state.y, state.x, state.y); enemyContact(); const noAmbush = !state.combat;
+    move(1, 0); const fighting = !!state.combat && state.combat.enemy.building; const panel = dialogText(); state.combat.hp = 1; battleAction('attack');
+    const afterHouse = { holds: state.wars[s.id].holds, guards: state.wars[s.id].guards, left: state.wars[s.id].left };
+    // the rest through the same bookkeeping soldiers and fights use
+    const rest = foes.filter(f => f !== h0); const last = rest.pop();
     for (const f of rest) { removeEnemyData(overworld, f.x, f.y); overworld[f.y][f.x] = '.'; noteKill(f.e); }
-    const won = { owner: s.owner, war: state.wars[s.id], coinGain: state.coin - before.coin, people: state.town.people - before.people, cap: housingCap() - before.cap, left: warFoes(s.id).length, annexed: annexedCount() };
-    const coin = state.coin; state.town.food = 99; advanceDay();
-    return { before, total: foes.length, midway, won, tribute: state.coin - coin, goods: s.surplus.length, text: document.getElementById('town-stats').textContent };
+    const open = { cleared: state.wars[s.id].cleared, left: state.wars[s.id].left, people: s.people, owner: s.owner };
+    removeEnemyData(overworld, last.x, last.y); overworld[last.y][last.x] = '.'; noteKill(last.e);
+    const cleared = { cleared: state.wars[s.id].cleared, left: state.wars[s.id].left, people: s.people, owner: s.owner, log: state.log[0].t };
+    state.x = s.x; state.y = s.y; closeDialog(); interact();
+    return { total: foes.length, houses: houses.length, guards: guards.length, shut, still, noAmbush, fighting, panel, afterHouse, open, cleared, claimed: { owner: s.owner, people: s.people, war: state.wars[s.id], hostile: state.hostile[s.id], zone: state.zone, visiting: state.visiting, coin: state.coin - before.coin, annexed: annexedCount() }, before };
   });
-  assert.equal(r.midway, r.total - 1);
-  assert.equal(r.won.owner, 'player'); assert.equal(r.won.war, undefined); assert.equal(r.won.left, 0); assert.equal(r.won.annexed, 1);
-  assert.ok(r.won.coinGain >= 20 + r.before.size * 3, JSON.stringify(r.won)); assert.equal(r.won.people, 2); assert.equal(r.won.cap, 4);
-  assert.equal(r.tribute, 3);
-  assert.ok(r.text.includes('Annexed'), r.text);
+  assert.deepEqual(r.shut, { zone: 'overworld', dialog: true }); assert.equal(r.still, true); assert.equal(r.noAmbush, true); assert.equal(r.fighting, true); assert.ok(r.panel.includes('Barricaded House'), r.panel);
+  assert.deepEqual(r.afterHouse, { holds: r.houses - 1, guards: r.guards, left: r.total - 1 });
+  assert.equal(r.open.cleared, false); assert.equal(r.open.left, 1); assert.equal(r.open.owner, null);
+  assert.equal(r.cleared.cleared, true); assert.equal(r.cleared.left, 0); assert.equal(r.cleared.people, 0); assert.equal(r.cleared.owner, null); assert.ok(r.cleared.log.includes('Walk into'), r.cleared.log);
+  assert.equal(r.claimed.owner, 'player'); assert.equal(r.claimed.people, 2); assert.equal(r.claimed.war, undefined); assert.equal(r.claimed.hostile, undefined); assert.equal(r.claimed.zone, 'town'); assert.equal(r.claimed.annexed, 1);
+  assert.ok(r.claimed.coin >= 20 + r.before.size * 3, JSON.stringify(r.claimed));
 }));
 
 test('an annexed settlement cannot be attacked again, and it stays out of raids and rivalries', () => game(async page => {
@@ -289,18 +299,22 @@ test('natural enemy spawning does not count war armies and raiders against its c
   assert.equal(r.after, r.before + 1);
 }));
 
-test('rival settlements fight: the stronger side wins, the weaker side can be taken over', () => game(async page => {
+test('settlements go to war: citizens die and buildings burn, nobody is annexed, and the loser starts again with two citizens and nothing built', () => game(async page => {
   const r = await page.evaluate(() => {
-    const mk = (id, people, aggression) => ({ id, name: id.toUpperCase(), people, cap: people, aggression, discovered: false, owner: null });
+    const [a, b] = [settlements[0], settlements[1]]; ensureWarWorld(); state.day = 10;
+    for (const s of settlements) { s.owner = null; s.stock = {}; }
+    a.people = 12; a.aggression = .5; b.people = 3; a.surplus = ['wood', 'iron']; b.surplus = ['gems', 'gold']; b.stock = { gems: 30, gold: 20 };
+    const w = startNpcWar(a, b); const listed = state.npcWars.length;
     const real = Math.random; Math.random = () => 0.9;
-    const a = mk('a', 10, 0.5), b = mk('b', 3, 0); const t1 = npcConflict(a, b); const win = { a: a.people, b: b.people, owner: b.owner, t1 };
-    Math.random = () => 0.5;
-    const c = mk('c', 3, 0.2), d = mk('d', 10, 0); const t2 = npcConflict(c, d); const lose = { c: c.people, d: d.people, owner: d.owner, t2 };
-    Math.random = real;
-    return { win, lose };
+    let days = 0; try { while (state.npcWars.includes(w) && days < 20) { state.day++; npcWarTurn(); days++; } } finally { Math.random = real; }
+    const plots = Object.keys(buildNpcTown(b).plots).length;
+    state.day += 1; const regrown = []; for (let i = 0; i < 12; i++) { worldTurn(); regrown.push(Object.keys(buildNpcTown(b).plots).length); }
+    return { listed, over: !state.npcWars.includes(w), days, a: [a.people, a.owner], b: [b.people, b.owner, b.wreck], plots, loot: { gems: a.stock.gems, gold: a.stock.gold }, emptied: Object.keys(b.stock).length, regrown, news: state.log.some(l => l.t.includes('has won the war')) };
   });
-  assert.deepEqual([r.win.a, r.win.b, r.win.owner], [11, 2, 'a']); assert.ok(r.win.t1.includes('taken over'));
-  assert.deepEqual([r.lose.c, r.lose.d, r.lose.owner], [2, 10, null]); assert.ok(r.lose.t2.includes('driven off'));
+  assert.equal(r.listed, 1); assert.equal(r.over, true); assert.ok(r.days >= 1 && r.days <= 8, 'days ' + r.days);
+  assert.ok(r.a[0] >= 8 && r.a[1] === null); assert.equal(r.b[0] >= 2, true); assert.equal(r.b[1], null);
+  assert.equal(r.plots, 0, 'every building of the loser is gone'); assert.equal(r.loot.gems >= 30 && r.loot.gold >= 20, true);
+  assert.ok(r.regrown[r.regrown.length - 1] > 0 && r.regrown.every((n, i) => i === 0 || n >= r.regrown[i - 1]), JSON.stringify(r.regrown));
 }));
 
 test('days of random raids and rivalries keep the world consistent', () => game(async page => {
@@ -312,10 +326,10 @@ test('days of random raids and rivalries keep the world consistent', () => game(
       worldTurn();
       const raiders = foeBox().filter(f => f.e.raid).length;
       if (state.raid ? raiders !== state.raid.left : raiders !== 0) bad.push('raid ' + i + ': ' + raiders + ' vs ' + (state.raid ? state.raid.left : 'none'));
-      for (const s of settlements) { if (s.people < 2 || s.people > s.cap + 3) bad.push(s.id + ' people ' + s.people); if (s.aggression < 0 || s.aggression > 0.6) bad.push(s.id + ' temper'); if (s.owner && s.owner !== 'player' && !settlements.some(t => t.id === s.owner)) bad.push('owner'); }
+      for (const s of settlements) { if (s.people < 1 || s.people > s.cap + 3) bad.push(s.id + ' people ' + s.people); if (s.aggression < 0 || s.aggression > 0.6) bad.push(s.id + ' temper'); if (s.owner && s.owner !== 'player' && !settlements.some(t => t.id === s.owner)) bad.push('owner'); }
       if (bad.length) break;
     }
-    return { bad, ruled: settlements.filter(s => s.owner).length };
+    return { bad, ruled: settlements.filter(s => s.owner).length, wars: state.npcWars.length };
   });
   assert.deepEqual(r.bad, []);
 }));
@@ -327,7 +341,7 @@ test('wars, raids, marching orders and settlement tempers survive saving; old sa
     const data = JSON.parse(JSON.stringify(buildSaveData()));
     state.wars = {}; state.raid = null; state.escort = 0; s.people = 99;
     hydrateWorld(data);
-    const same = { war: state.wars[s.id], raid: state.raid, escort: state.escort, people: settlements[0].people, aggression: settlements[0].aggression, foes: foeBox().length, faction: foeBox().filter(f => f.e.faction === 'war').every(f => f.e.townId === s.id && f.e.leash) };
+    const same = { war: state.wars[s.id], raid: state.raid, escort: state.escort, people: settlements[0].people, aggression: settlements[0].aggression, foes: foeBox().length, faction: foeBox().filter(f => f.e.faction === 'war').every(f => f.e.townId === s.id && (f.e.leash || f.e.building)) };
     // a save from before wars existed
     const old = JSON.parse(JSON.stringify(data));
     for (const k of ['wars', 'raid', 'escort', 'assignBackup']) delete old.state[k];
