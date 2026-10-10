@@ -128,7 +128,8 @@ function npcBuilding(key) {
   else houseDialog(s, p);
 }
 function npcCaravan(s) {
-  showDialog('<h2>' + swatch(s.id) + esc(s.name) + ' caravan post</h2><p>Wagons come and go from here. Ride to any settlement you have visited, or look at the world map.</p><button onclick="openMap()">World map and fast travel</button><button onclick="closeDialog()">Leave</button>');
+  const deal = isAlly(s.id) ? '<p>Your trade deal with ' + esc(s.name) + ' is running: ' + state.deals[s.id].trips + ' caravan trip' + (state.deals[s.id].trips === 1 ? '' : 's') + ' so far. Change what the caravans carry at your own caravan post.</p>' : '<p>Trade deals are sealed at the hall, once they trust you.</p>';
+  showDialog('<h2>' + swatch(s.id) + esc(s.name) + ' caravan post</h2><p>Wagons come and go from here. Ride to any settlement you have visited, or look at the world map.</p>' + deal + '<button onclick="openMap()">World map and fast travel</button><button onclick="closeDialog()">Leave</button>');
 }
 function npcShop(s, kind) {
   ensureWarWorld();
@@ -205,6 +206,8 @@ function visitorGossip(p) {
   if (others.length) { const o = others[h % others.length]; lines.push('They say ' + o.name + ' is ' + moodOf(o) + ', and about ' + o.people + ' strong.'); }
   if (state.raid && state.raid.from === s.id) lines.push('Some of our people marched on Brackenford. I hope that goes well for them, whatever you think of it.');
   if (state.wars[s.id]) lines.push('We are at war with Brackenford!');
+  const war = warOf(s.id); if (war) { const foe = townById(war.a === s.id ? war.d : war.a); if (foe) lines.push(war.a === s.id ? 'Our warriors are marching on ' + foe.name + '. Pray for us.' : foe.name + ' has come against us! Anyone who can hold a spear is welcome.'); }
+  if (isAlly(s.id)) lines.push('Brackenford’s caravans are always welcome here, ally.');
   if (s.owner === 'player') lines.push('We fly Brackenford’s banner now. It has not been so bad.');
   return lines[h % lines.length];
 }
@@ -217,6 +220,7 @@ function renderVisitPanel() {
     '<div class="town-metric">Citizens<b>' + s.people + '</b></div>' +
     '<div class="town-metric">Mood<b>' + moodOf(s) + '</b></div>' +
     '<div class="town-metric">Standing<b>' + standingText(s) + '</b></div>' +
+    (warOf(s.id) ? '<div class="town-metric">War<b>fighting ' + esc(townById(warOf(s.id).a === s.id ? warOf(s.id).d : warOf(s.id).a).name) + '</b></div>' : '') +
     '<div class="town-metric">Distance<b>' + Math.round(Math.hypot(s.x - HOME.x, s.y - HOME.y)) + ' leagues</b></div>' +
     '<div class="town-metric">Ruler<b>' + esc(owner || 'its own people') + '</b></div>';
   const uses = { market: 'trade goods', inn: 'rest for coin', travel: 'world map and fast travel', hall: 'news and war', well: 'free healing', huntersLodge: 'furs and game', smithy: 'weapons and armor', jeweler: 'gems, silver and gold', mine: 'stone and ore' };
