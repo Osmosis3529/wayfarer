@@ -564,3 +564,14 @@ test('the market, longhouse and caravan post are on the settlement map, with cos
   assert.ok(r.shop.includes('Mara’s Market') && !/trading post/i.test(r.shop), r.shop);
   assert.ok(r.text.includes('longhouse'), r.text);
 }));
+
+test('the hunters’ lodge adds its extra heart once, however often it is rebuilt', () => game(async page => {
+  const r = await page.evaluate(() => {
+    RICH(); state.town.people = 40; const hp0 = state.maxHp;
+    build('huntersLodge'); const first = state.maxHp - hp0;
+    state.built.huntersLodge = false; build('huntersLodge'); const second = state.maxHp - hp0;
+    const old = JSON.parse(JSON.stringify(buildSaveData())); delete old.state.lodgeBonus; state.lodgeBonus = false; hydrateWorld(old);
+    return { first, second, migrated: state.lodgeBonus };
+  });
+  assert.equal(r.first, 1); assert.equal(r.second, 1); assert.equal(r.migrated, true);
+}));

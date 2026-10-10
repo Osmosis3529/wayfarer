@@ -160,9 +160,35 @@ test('wars cannot touch an annexed settlement, and Brackenford being wiped out l
     state.day = 20; for (const o of settlements) o.people = 8; settlements[1].discovered = true;
     const real = Math.random; let involved = 0;
     try { for (let i = 0; i < 300; i++) { Math.random = () => (i * 0.37) % 1; state.npcWars = []; maybeStartNpcWar(); if (state.npcWars.some(w => w.a === s.id || w.d === s.id)) involved++; } } finally { Math.random = real; }
-    state.hostile[settlements[1].id] = { since: 1, via: null, next: 0 }; hostilityTurn(); const raid = !!state.raid;
+    state.hostile[settlements[1].id] = { since: 1, vias: [], war: true, next: 0 }; hostilityTurn(); const raid = !!state.raid;
     wipeHome(); const colony = state.colonies[s.id];
     return { involved, raid, colony: { people: colony.town.people, hut: colony.built.hut, longhouse: colony.built.longhouse }, home: Object.values(state.built).filter(Boolean).length };
   });
   assert.equal(r.involved, 0); assert.equal(r.raid, true); assert.deepEqual(r.colony, { people: 6, hut: true, longhouse: true }); assert.equal(r.home, 0);
+}));
+
+test('dawn passes cleanly while you stand inside an annexed settlement, even when a war or a raid ends right then', () => game(async page => {
+  const r = await page.evaluate(() => {
+    const s = setup(); interact(); closeDialog(); state.town.people = 6; build('hut'); build('longhouse'); build('garden'); assignWorker('garden', 1);
+    const mine = townPeople.map(p => p.id).join(), homeFood = (state.parked).town.food;
+    state.day = 20; for (const o of settlements) { o.owner = o === s ? 'player' : null; o.people = 8; }
+    const a = settlements[1], d = settlements[2]; a.discovered = d.discovered = true; d.people = 1; a.people = 9;
+    state.npcWars = [{ id: 7, a: a.id, d: d.id, since: 15, aid: 0, you: null, aSize: 9, dSize: 1 }];
+    state.raid = { from: a.id, name: a.name, left: 0, total: 3, deadline: 0, looted: 0, killed: 0, war: true };
+    let err = null; const real = Math.random; Math.random = () => 0.99;
+    try { advanceDay(); } catch (e) { err = e.message; } finally { Math.random = real; }
+    const saved = !!localStorage.getItem(AUTOSAVE_KEY);
+    return { err, saved, cur: state.cur, zone: state.zone, built: state.built.garden === true, people: townPeople.map(p => p.id).join() === mine || townPeople.length > 0, night: state.day, warsLeft: state.npcWars.length, title: townTitle(), name: s.name };
+  });
+  assert.equal(r.err, null); assert.equal(r.saved, true); assert.equal(r.cur, 'town_0'); assert.equal(r.zone, 'town'); assert.equal(r.built, true); assert.equal(r.people, true); assert.equal(r.warsLeft, 0); assert.ok(r.title.startsWith(r.name), r.title);
+}));
+
+test('the world map keeps Brackenford’s and each colony’s own citizen counts, and a colony’s caravan post says deals run from home', () => game(async page => {
+  const r = await page.evaluate(() => {
+    const s = setup(); state.town.people = 20; state.visited[s.id] = true; interact(); closeDialog(); state.town.people = 9; build('hut'); build('longhouse'); build('caravanPost');
+    openMap(); const text = dialogText(); closeDialog(); openBuilding('caravanPost'); const post = dialogText(); closeDialog();
+    return { text, post, name: s.name };
+  });
+  assert.ok(r.text.includes('Brackenford') && r.text.includes('20 citizens') && r.text.includes('9 citizens'), r.text); assert.ok(!/Brackenford[^·]*· your home · 9 citizens/.test(r.text));
+  assert.ok(r.post.includes('run from Brackenford’s caravan post'), r.post);
 }));

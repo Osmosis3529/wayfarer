@@ -40,15 +40,15 @@ async function game(fn) {
 test('a settlement at war with you sends warbands on a schedule, and one at peace with you does not', () => game(async page => {
   const r = await page.evaluate(() => {
     home(); setAlone(); const s = settlements[0], t = settlements[1]; s.people = 9; state.day = 20;
-    state.hostile[s.id] = { since: 18, via: null, next: 22 };
+    state.hostile[s.id] = { since: 18, vias: [], war: true, next: 22 };
     hostilityTurn(); const early = !!state.raid;
     state.day = 22; hostilityTurn(); const raid = state.raid ? { ...state.raid } : null, foes = foeBox().filter(f => f.e.raid).length;
     const next = state.hostile[s.id].next;
     hostilityTurn(); const same = state.raid && state.raid.from === s.id;
     return { early, raid, foes, next, same, quiet: !state.hostile[t.id], day: state.day };
   });
-  assert.equal(r.early, false); assert.equal(r.raid.war, true); assert.equal(r.raid.from, 'town_0'); assert.equal(r.foes, r.raid.left); assert.ok(r.raid.total >= 3 && r.raid.total <= 9);
-  assert.ok(r.next >= r.day + 4 && r.next <= r.day + 6, JSON.stringify(r)); assert.equal(r.same, true); assert.equal(r.quiet, true);
+  assert.equal(r.early, false); assert.equal(r.raid.war, true); assert.equal(r.raid.from, 'town_0'); assert.equal(r.foes, r.raid.left); assert.ok(r.raid.total >= 2 && r.raid.total <= 8);
+  assert.ok(r.next >= r.day + 5 && r.next <= r.day + 8, JSON.stringify(r)); assert.equal(r.same, true); assert.equal(r.quiet, true);
 }));
 
 test('raiders that get through a war assault kill citizens and burn buildings, but never take the settlement', () => game(async page => {
@@ -72,7 +72,8 @@ test('if every citizen dies the settlement starts again with two and loses every
   const r = await page.evaluate(() => {
     home(); setAlone(); const s = settlements[0]; s.people = 9; state.town.people = 2; state.up.market = [true, false, false]; state.town.tier = 2; const inv = state.inv.wood, coin = state.coin;
     startRaid(s, { war: true });
-    for (const [x, y] of raiderTiles().slice(0, 2)) raiderLoots(x, y);
+    const real = Math.random; Math.random = () => 0.1;      // every raider that gets through kills
+    try { for (const [x, y] of raiderTiles().slice(0, 2)) raiderLoots(x, y); } finally { Math.random = real; }
     return { people: state.town.people, built: Object.values(state.built).filter(Boolean).length, tier: state.town.tier, up: Object.keys(state.up).length, food: state.town.food, raid: state.raid, foes: foeBox().filter(f => f.e.raid).length, wood: state.inv.wood === inv, coin: state.coin === coin, housing: housingCap(), soldiers: state.soldiers.length, log: state.log[0].t };
   });
   assert.equal(r.people, 2); assert.equal(r.built, 0); assert.equal(r.tier, 1); assert.equal(r.up, 0); assert.equal(r.raid, null); assert.equal(r.foes, 0);
@@ -81,15 +82,15 @@ test('if every citizen dies the settlement starts again with two and loses every
 
 test('allies send soldiers when you are attacked, and a plain raid still only loots', () => game(async page => {
   const r = await page.evaluate(() => {
-    home(); setAlone(); const s = settlements[5], a = ally(0), b = ally(1); b.people = 4; ally(2).people = 2;   // the third is too small to help
+    home(); setAlone(); state.day = 30; const s = settlements[5], a = ally(0), b = ally(1); s.people = 16; b.people = 4; ally(2).people = 2;   // the third is too small to help
     startRaid(s, { war: true }); const total = state.raid.total, left = state.raid.left;
     const text = state.log.slice(0, 3).map(l => l.t).join(' | '), raiders = foeBox().filter(f => f.e.raid).length;
     for (const [x, y] of raiderTiles()) overworld[y][x] = '.'; state.raid = null;
-    state.hostile[settlements[3].id] = { since: 1, via: null, next: 99 }; ally(3).people = 8; const hostileAlly = state.hostile[settlements[3].id];
+    state.hostile[settlements[3].id] = { since: 1, vias: [], war: true, next: 99 }; ally(3).people = 8; const hostileAlly = state.hostile[settlements[3].id];
     startRaid(s, {}); const plain = state.raid.war;
     return { total, left, raiders, text, plain, helpers: total - left, hostileAlly: !!hostileAlly };
   });
-  assert.ok(r.helpers >= 2 && r.helpers <= 5, JSON.stringify(r)); assert.equal(r.raiders, r.left); assert.ok(r.text.includes('Allied soldiers ride to your aid'), r.text); assert.equal(r.plain, false);
+  assert.ok(r.helpers >= 2 && r.helpers <= 4 && r.total >= 6, JSON.stringify(r)); assert.equal(r.raiders, r.left); assert.ok(r.text.includes('Allied soldiers ride to your aid'), r.text); assert.equal(r.plain, false);
 }));
 
 test('an ally that is attacked calls for help: send supplies or fight for them, or lose the alliance after three days', () => game(async page => {
@@ -189,7 +190,7 @@ test('a ruined settlement shows fewer buildings, can still be entered, and recov
 test('wars, hostility, aid calls and settlement wars survive saving', () => game(async page => {
   const r = await page.evaluate(() => {
     home(); setAlone(); const a = ally(0), d = settlements[1], x = settlements[2]; state.day = 7;
-    startNpcWar(d, a); joinWar(state.npcWars[0].id, 'd'); state.hostile[x.id] = { since: 5, via: a.id, next: 9 };
+    startNpcWar(d, a); joinWar(state.npcWars[0].id, 'd'); state.hostile[x.id] = { since: 5, vias: [a.id], war: false, next: 9 };
     const keep = { wars: JSON.parse(JSON.stringify(state.npcWars)), aid: JSON.parse(JSON.stringify(state.aid)), hostile: JSON.parse(JSON.stringify(state.hostile)), foes: foeBox().length, seq: state.npcWarSeq };
     const save = JSON.parse(JSON.stringify(buildSaveData())); state.npcWars = []; state.aid = {}; state.hostile = {}; state.npcWarSeq = 0; hydrateWorld(save);
     // a save from before any of this existed
@@ -212,4 +213,88 @@ test('allies join a war you declare: they cut down some defenders, never the cap
   });
   assert.equal(r.blocked, false); assert.equal(r.ok, true); assert.ok(r.alive < r.size && r.alive >= Math.ceil(r.size / 2), JSON.stringify(r));
   assert.equal(r.captain, true); assert.equal(r.houses, r.holds); assert.equal(r.left, r.count); assert.equal(r.guards, r.alive); assert.ok(r.log.includes('Allied soldiers have already cut down'), r.log);
+}));
+
+test('a settlement is only at war with you as long as one of its causes lasts: each ally that hates it, or the war you declared', () => game(async page => {
+  const r = await page.evaluate(() => {
+    home(); setAlone(); const [A, B, C, D] = settlements; RIVALS([0, 1], [2, 1], [2, 3]);
+    for (const s of [A, B, C, D]) { s.discovered = true; s.people = 8; }
+    ally(0); ally(2);                                                  // B hates both of them, D hates C
+    makeHostile(B, A.id); makeHostile(B, C.id); makeHostile(D, C.id);
+    const start = { b: [...state.hostile[B.id].vias].sort(), d: state.hostile[D.id].vias };
+    breakAlliance(A.id); const afterA = { b: !!state.hostile[B.id], d: !!state.hostile[D.id], vias: state.hostile[B.id] && state.hostile[B.id].vias };   // C still hates B
+    // allying with B (made possible by hand here) drops the alliance with C, and everyone hostile only through C stands down
+    makeHostile(B, C.id); delete state.hostile[B.id]; state.deals[B.id] = { sell: null, buy: null, gear: false, last: 1, since: 1, trips: 0, profit: 0 };
+    makeHostile(C, B.id); const afterSwap = { c: isAlly(C.id), dGone: !state.hostile[D.id], cHostile: !!state.hostile[C.id] };
+    // a war you declare on a rival of an ally survives making peace
+    ally(0); A.people = 8; makeHostile(B, A.id); state.hostile[B.id].war = true; delete state.hostile[B.id].fresh; state.wars[B.id] = { total: 2, left: 2, guards: 2, holds: 0, size: 4, cleared: false };
+    sueForPeace(B.id); const afterPeace = { war: !!state.wars[B.id], hostile: !!state.hostile[B.id], warFlag: state.hostile[B.id] && state.hostile[B.id].war };
+    breakAlliance(A.id); const afterEnd = !!state.hostile[B.id];
+    return { start, afterA, afterSwap, afterPeace, afterEnd };
+  });
+  assert.deepEqual(r.start, { b: ['town_0', 'town_2'], d: ['town_2'] });
+  assert.deepEqual([r.afterA.b, r.afterA.d, r.afterA.vias], [true, true, ['town_2']]);
+  assert.deepEqual(r.afterSwap, { c: false, dGone: true, cHostile: true });
+  assert.deepEqual(r.afterPeace, { war: false, hostile: true, warFlag: false }); assert.equal(r.afterEnd, false);
+}));
+
+test('allies are never the ones raiding you, and never help against their own warband', () => game(async page => {
+  const r = await page.evaluate(() => {
+    home(); setAlone(); state.day = 20; const a = ally(0), b = ally(1); a.aggression = b.aggression = 0.6; a.people = b.people = 9; a.cap = b.cap = 9;
+    for (const s of settlements.slice(2)) s.aggression = 0;
+    const real = Math.random; let raidsFromAllies = 0;
+    try { for (let i = 0; i < 400; i++) { Math.random = () => (i * 0.0173) % 0.05; state.raid = null; for (const [x, y] of raiderTiles()) { removeEnemyData(overworld, x, y); overworld[y][x] = '.'; } worldTurn(); if (state.raid && (state.raid.from === a.id || state.raid.from === b.id)) raidsFromAllies++; } } finally { Math.random = real; }
+    state.raid = null; for (const [x, y] of raiderTiles()) { removeEnemyData(overworld, x, y); overworld[y][x] = '.'; }
+    const c = settlements[2]; c.people = 12; startRaid(c, { war: true }); const total = state.raid.total, text = state.log.slice(0, 3).map(l => l.t).join(' ');
+    state.raid = null; for (const [x, y] of raiderTiles()) { removeEnemyData(overworld, x, y); overworld[y][x] = '.'; }
+    state.hostile = {}; state.aid = {}; state.npcWars = []; ally(0); ally(1); a.people = 16; b.people = 12;      // the long run above may have cost an alliance
+    startRaid(a, { war: true }); const own = state.log.slice(0, 2).map(l => l.t).join(' ');     // their own warband: only the other ally rides to help
+    return { raidsFromAllies, total, left: state.raid.left, text, own, a: a.name, b: b.name };
+  });
+  assert.equal(r.raidsFromAllies, 0); assert.ok(new RegExp(r.b + ' \\(\\d\\)').test(r.own) && !new RegExp(r.a + ' \\(\\d\\)').test(r.own), r.own);
+}));
+
+test('a call for aid ends when the alliance does, and you cannot send help to a former ally', () => game(async page => {
+  const r = await page.evaluate(() => {
+    home(); setAlone(); const a = ally(0); a.people = 9; settlements[1].people = 9; state.day = 5; startNpcWar(settlements[1], a);
+    const open = !!state.aid[a.id]; breakAlliance(a.id); const gone = !state.aid[a.id];
+    state.aid[a.id] = { against: 'town_1', deadline: 9, helped: false }; const coin = state.coin; sendAid(a.id);
+    return { open, gone, coin: state.coin === coin, helped: state.aid[a.id].helped };
+  });
+  assert.equal(r.open, true); assert.equal(r.gone, true); assert.equal(r.coin, true); assert.equal(r.helped, false);
+}));
+
+test('a settlement fighting its own war is released from it when you attack or annex it, and its warriors leave the field', () => game(async page => {
+  const r = await page.evaluate(() => {
+    home(); setAlone(); RICH(); build('barracks'); state.town.people = 40; for (let i = 0; i < 30 && crew('barracks') < 3; i++) assignWorker('barracks', 1); syncSoldiers();
+    const a = settlements[0], d = settlements[1]; for (const s of [a, d]) { s.discovered = true; s.people = 7; clearRect(s.x - 9, s.y - 9, s.x + 9, s.y + 9); overworld[s.y][s.x] = 'S'; }
+    const w = startNpcWar(a, d); joinWar(w.id, 'd'); const npcFoes = () => foeBox().filter(f => f.e.faction === 'npcwar').length; const before = npcFoes();
+    declareWar(d.id); const after = { fighting: state.npcWars.length, foes: npcFoes(), siege: !!state.wars[d.id] };
+    const e = settlements[2]; e.discovered = true; e.people = 6; clearRect(e.x - 9, e.y - 9, e.x + 9, e.y + 9); overworld[e.y][e.x] = 'S'; const w2 = startNpcWar(settlements[3], e); joinWar(w2.id, 'd');
+    annex(e.id); const annexed = { wars: state.npcWars.filter(x => x.d === e.id).length, foes: foeBox().filter(f => f.e.faction === 'npcwar' && f.e.npcWar === w2.id).length };
+    return { before, after, annexed };
+  });
+  assert.ok(r.before >= 2); assert.deepEqual(r.after, { fighting: 0, foes: 0, siege: true }); assert.deepEqual(r.annexed, { wars: 0, foes: 0 });
+}));
+
+test('you cannot take up arms against an ally in someone else’s war', () => game(async page => {
+  const r = await page.evaluate(() => {
+    home(); setAlone(); const a = ally(0), b = settlements[1], c = ally(2); a.people = b.people = c.people = 8; b.discovered = true;
+    const w = startNpcWar(b, a); joinWar(w.id, 'a'); const attackAlly = foeBox().filter(f => f.e.faction === 'npcwar').length;
+    const w2 = startNpcWar(c, b); joinWar(w2.id, 'd'); const defendAgainstAlly = foeBox().filter(f => f.e.npcWar === w2.id).length;
+    joinWar(w.id, 'd'); const defendAlly = foeBox().filter(f => f.e.npcWar === w.id).length;
+    return { attackAlly, defendAgainstAlly, defendAlly };
+  });
+  assert.equal(r.attackAlly, 0); assert.equal(r.defendAgainstAlly, 0); assert.ok(r.defendAlly >= 2);
+}));
+
+test('soldiers on duty stop raiders at the gate when the deadline comes, one raider each', () => game(async page => {
+  const r = await page.evaluate(() => {
+    home(); setAlone(); build('barracks'); state.town.people = 30; for (let i = 0; i < 30 && crew('barracks') < 3; i++) assignWorker('barracks', 1);
+    const s = settlements[0]; s.people = 16; state.day = 40; startRaid(s, { war: true }); const total = state.raid.total, people = state.town.people, guards = soldierCount();
+    const real = Math.random; Math.random = () => 0.1;
+    try { state.day = state.raid.deadline; raidDeadline(); } finally { Math.random = real; }
+    return { total, guards, killed: people - state.town.people, raid: state.raid, left: foeBox().filter(f => f.e.raid).length, text: state.log.slice(0, 6).map(l => l.t).join(' | ') };
+  });
+  assert.ok(r.total > r.guards, JSON.stringify(r)); assert.equal(r.killed, r.total - r.guards, 'only the raiders the soldiers could not stop got through'); assert.equal(r.raid, null); assert.equal(r.left, 0); assert.ok(r.text.includes('stop ' + r.guards + ' raider'), r.text);
 }));

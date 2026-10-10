@@ -76,7 +76,7 @@ function abandonQuest(id) {
   const s = townById(id), r = relOf(id);
   if (!s || !r.quest) return;
   r.quest = null; say('You drop the job for ' + s.name + '.');
-  if (inSettlement(s) && dialogIsOpen()) npcHallDialog(s); else if (dialogIsOpen()) journal();
+  if (dialogIsOpen()) { if (document.getElementById('dialog').textContent.includes('They think of you as')) npcHallDialog(s); else journal(); }
 }
 // Every enemy you or your soldiers defeat counts towards the hunting jobs you have taken.
 function huntKill() {
@@ -114,24 +114,33 @@ function signDeal(id) {
 function breakAlliance(id, why) {
   const s = townById(id);
   if (!s || !isAlly(id)) return;
-  delete state.deals[id];
+  delete state.deals[id]; delete state.aid[id];
   relOf(id).favor = 0;
   say(why || 'You end your alliance with ' + s.name + '.', 'alert');
   reconcileHostility();
   render(); if (dialogIsOpen()) caravanDialog('caravanPost');
 }
-// Anyone who hates one of your allies makes war on you; they stand down when that alliance ends.
+// Anyone who hates one of your allies makes war on you, and stands down when the last of those alliances ends. A war
+// you declared yourself (war: true) lasts until it is settled. state.hostile[id] = { since, next, vias: [allies that
+// cause it], war }.
+function hostileCauses(id) { return allies().filter(a => (a.dislikes || []).includes(id)).map(a => a.id); }
 function makeHostile(t, via) {
   if (!state.hostile) state.hostile = {};
-  if (t.owner === 'player' || state.hostile[t.id]) return;
-  state.hostile[t.id] = { since: state.day, via, next: state.day + 2 };
+  if (t.owner === 'player') return;
+  const fresh = !state.hostile[t.id], h = state.hostile[t.id] || (state.hostile[t.id] = { since: state.day, next: state.day + 2, vias: [], war: false });
+  if (via && !h.vias.includes(via)) h.vias.push(via);
   relOf(t.id).quest = null;
-  if (isAlly(t.id)) { delete state.deals[t.id]; say('Your alliance with ' + t.name + ' ends: they will not stand beside someone allied with ' + (townById(via) || { name: 'their rival' }).name + '.', 'alert'); }
-  say(t.name + ' declares war on Brackenford! They hate ' + (townById(via) || { name: 'your ally' }).name + ', and so they hate you.', 'alert');
+  if (isAlly(t.id)) {
+    delete state.deals[t.id]; delete state.aid[t.id];
+    say('Your alliance with ' + t.name + ' ends: they will not stand beside someone allied with ' + (townById(via) || { name: 'their rival' }).name + '.', 'alert');
+    reconcileHostility();
+  }
+  if (fresh) say(t.name + ' declares war on Brackenford! They hate ' + (townById(via) || { name: 'your ally' }).name + ', and so they hate you.', 'alert');
 }
 function reconcileHostility() {
   for (const [id, h] of Object.entries(state.hostile || {})) {
-    if (!h.via || isAlly(h.via)) continue;          // a war you started (no 'via') lasts until it is settled
+    h.vias = hostileCauses(id);
+    if (h.war || h.vias.length) continue;
     delete state.hostile[id];
     say((townById(id) || { name: 'A settlement' }).name + ' calls off its war against Brackenford.', 'gold');
   }
@@ -187,6 +196,7 @@ function dealCycle(id, field) {
 }
 function dealGear(id) { const d = state.deals && state.deals[id]; if (!d) return; d.gear = !d.gear; caravanDialog('caravanPost'); }
 function caravanDialog(key) {
+  if (state.cur) { showDialog('<h2>' + esc(bld(key)) + '</h2>' + staffBlock(key) + '<p>Trade deals are run from Brackenford’s caravan post: its caravans do not ride out of an annexed settlement.</p><button onclick="closeDialog()">Leave</button>'); return; }
   const running = new Set(runningDeals()), ids = dealOrder();
   const rows = ids.map(id => {
     const s = townById(id), d = state.deals[id], on = running.has(id);
@@ -205,8 +215,8 @@ function caravanDialog(key) {
 // ---------------------------------------------------------------- the hall of another settlement
 function npcHallDialog(s) {
   ensureWarWorld();
-  const w = state.wars[s.id], t = npcMap(), owner = ownerText(s), r = relOf(s.id), rivals = rivalsOf(s);
-  let body = '<h2>' + swatch(s.id) + esc(s.name) + '</h2><p><strong>' + SIZE_NAMES[t.bracket] + '</strong> · ' + s.people + ' citizens · ' + moodOf(s) + (owner ? ' · ' + esc(owner) : '') + '</p><p>' + esc(regionNote(s) || '') + '</p>' +
+  const w = state.wars[s.id], owner = ownerText(s), r = relOf(s.id), rivals = rivalsOf(s);
+  let body = '<h2>' + swatch(s.id) + esc(s.name) + '</h2><p><strong>' + SIZE_NAMES[townBracket(s.people)] + '</strong> · ' + s.people + ' citizens · ' + moodOf(s) + (owner ? ' · ' + esc(owner) : '') + '</p><p>' + esc(regionNote(s) || '') + '</p>' +
     '<p>They think of you as: <strong>' + standingText(s) + '</strong>' + (r.done ? ' (' + r.done + ' job' + (r.done === 1 ? '' : 's') + ' done)' : '') + '. ' + (rivals.length ? 'They cannot stand ' + rivals.map(x => esc(x.name)).join(' or ') + '.' : 'They have no rivals.') + '</p>';
   if (!w && !isHostile(s.id) && s.owner !== 'player') {
     if (r.quest) {

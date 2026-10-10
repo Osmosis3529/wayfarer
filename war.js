@@ -206,7 +206,8 @@ function declareWar(id) {
   const g = placeFoes(s, guards, 2, 5), h = placeFoes(s, holds, 2, 4);
   if (!g && !h) { say('There is no open ground around ' + s.name + ' for a battle. Try again later.', 'alert'); return false; }
   state.wars[id] = { total: g + h, left: g + h, guards: g, holds: h, size, cleared: false };
-  state.hostile[id] = { since: state.day, via: null, next: state.day + 3 };
+  { const nw = warOf(id); if (nw) endNpcWar(nw, nw.d, 'draw'); }        // its own war is over: you have come for it
+  state.hostile[id] = { ...(state.hostile[id] || { since: state.day, vias: [] }), war: true, next: state.day + 3 };
   const r = relOf(id); r.quest = null; r.favor = 0;
   if (state.zone === 'town' && state.visiting === id) exitTown();                     // its gates close behind you
   const helped = siegeHelp(s);
@@ -247,7 +248,7 @@ function sueForPeace(id) {
   if (state.coin < cost) { say('Peace with ' + s.name + ' costs ' + cost + ' coin.', 'alert'); render(); return; }
   state.coin -= cost;
   for (const [x, y] of warFoes(id)) { removeEnemyData(overworld, x, y); overworld[y][x] = '.'; }
-  delete state.wars[id]; delete state.hostile[id];
+  delete state.wars[id]; if (state.hostile[id]) { state.hostile[id].war = false; reconcileHostility(); }
   s.aggression = Math.min(MAX_AGGRESSION, +(s.aggression + .15).toFixed(2));
   say(s.name + ' accepts your tribute of ' + cost + ' coin and lays down arms. They will remember it.', 'gold');
   render(); if (dialogIsOpen()) closeDialog();
@@ -258,6 +259,7 @@ function annex(id) {
   const s = townById(id), w = state.wars[id];
   delete state.wars[id]; delete state.hostile[id];
   if (!s) return;
+  { const nw = warOf(id); if (nw) endNpcWar(nw, nw.d, 'draw'); }
   const loot = 20 + (w ? w.size : 3) * 3;
   s.owner = 'player'; s.people = 2; s.cap = Math.max(s.cap || 3, 3); s.wreck = 0; s.stock = {};
   state.coin += loot;
@@ -320,7 +322,7 @@ function raiderTiles() {
 function startRaid(s, opts = {}) {
   ensureWarWorld();
   if (state.raid) return false;
-  const war = !!opts.war, n = war ? clamp(2 + Math.floor(s.people / 3) + Math.floor(state.day / 15), 2, 9) : clamp(2 + Math.floor(s.aggression * 6) + Math.floor(state.day / 12), 2, 8), foes = [];
+  const war = !!opts.war, n = war ? clamp(2 + Math.floor(s.people / 4) + Math.floor(state.day / 20), 2, 8) : clamp(2 + Math.floor(s.aggression * 6) + Math.floor(state.day / 12), 2, 8), foes = [];
   for (let i = 0; i < n - 1; i++) foes.push({ ...WAR_FOES.raider, faction: 'raid', raid: true, townId: s.id, bonus: s.aggression > .3 || war ? 1 : 0 });
   foes.push({ ...WAR_FOES.chief, faction: 'raid', raid: true, townId: s.id });
   let placed = 0, dir = '';
@@ -341,7 +343,7 @@ function alliesHelp() {
   if (!r) return;
   const helped = [];
   for (const a of allies()) {
-    if (isHostile(a.id) || a.people < 3 || r.left <= 1) continue;
+    if (isHostile(a.id) || a.id === r.from || a.people < 3 || r.left <= 1) continue;
     const want = Math.min(r.left - 1, 1 + Math.floor(townBracket(a.people) / 2) + (a.people >= 8 ? 1 : 0));
     let killed = 0;
     for (const [x, y] of raiderTiles()) { if (killed >= want) break; removeEnemyData(overworld, x, y); overworld[y][x] = '.'; killed++; }
@@ -382,8 +384,8 @@ function raiderLoots(x, y) {
 }
 function raiderStrikes() {
   const parts = [];
-  if (state.town.people > 0) { loseCitizens(1); parts.push('kills a citizen'); }
-  if (Math.random() < .5) { const k = destroyBuilding(); if (k) parts.push('burns down the ' + buildingName(k).toLowerCase()); }
+  if (state.town.people > 0 && Math.random() < .75) { loseCitizens(1); parts.push('kills a citizen'); }
+  if (Math.random() < .4) { const k = destroyBuilding(); if (k) parts.push('burns down the ' + buildingName(k).toLowerCase()); }
   say('A raider breaks into Brackenford and ' + (parts.join(' and ') || 'finds nothing to destroy') + '!', 'alert');
   const r = state.raid;
   if (r) { r.looted++; r.left--; }
@@ -395,7 +397,7 @@ function endRaid() {
   if (!r) return;
   state.raid = null;
   const s = townById(r.from);
-  if (r.war && state.hostile[r.from]) state.hostile[r.from].next = state.day + 3 + Math.floor(Math.random() * 3);
+  if (r.war && state.hostile[r.from]) state.hostile[r.from].next = state.day + 4 + Math.floor(Math.random() * 3);
   if (r.looted === 0) {
     const reward = 5 * r.total; state.coin += reward;
     if (s && !r.war) s.aggression = +(s.aggression * .6).toFixed(2);
@@ -403,9 +405,17 @@ function endRaid() {
   } else say('The ' + (r.war ? 'assault' : 'raid') + ' from ' + r.name + ' is over: ' + r.looted + ' raider' + (r.looted === 1 ? '' : 's') + ' got through.', 'alert');
   render();
 }
+// Raiders still out when the deadline comes reach the town; each soldier on duty stops one of them at the gate.
 function raidDeadline() {
   if (!state.raid || state.day < state.raid.deadline) return;
-  for (const [x, y] of raiderTiles()) if (state.raid) raiderLoots(x, y);
+  let guards = state.built.barracks ? soldierCount() : 0, stopped = 0;
+  for (const [x, y] of raiderTiles()) {
+    if (!state.raid) break;
+    if (guards > 0) { guards--; stopped++; removeEnemyData(overworld, x, y); overworld[y][x] = '.'; state.raid.left--; state.raid.killed++; }
+    else raiderLoots(x, y);
+  }
+  if (stopped) say('Your soldiers stop ' + stopped + ' raider' + (stopped === 1 ? '' : 's') + ' at the gates.', 'gold');
+  if (state.raid && state.raid.left <= 0) endRaid();
   state.raid = null;
 }
 // Settlements that are at war with you keep sending warbands.
@@ -414,7 +424,7 @@ function hostilityTurn() {
     const s = townById(id);
     if (!s || s.owner === 'player') { delete state.hostile[id]; continue; }
     if (state.day < h.next || state.raid || !(state.town.people > 0) || s.people < 2) continue;
-    h.next = startRaid(s, { war: true }) ? state.day + 4 + Math.floor(Math.random() * 3) : state.day + 1;
+    h.next = startRaid(s, { war: true }) ? state.day + 5 + Math.floor(Math.random() * 4) : state.day + 1;
   }
 }
 
@@ -502,6 +512,7 @@ function warFoesNpc(w) {
 function joinWar(id, side) {
   const w = warById(id), a = w && townById(w.a), d = w && townById(w.d);
   if (!w || !a || !d || (side !== 'a' && side !== 'd')) return;
+  if ((side === 'a' && isAlly(d.id)) || (side === 'd' && isAlly(a.id))) { say('You cannot take up arms against your ally ' + (side === 'a' ? d : a).name + '.', 'alert'); if (dialogIsOpen()) journal(); return; }
   if (warFoesNpc(w).length) { say('The fighting around ' + d.name + ' is already on. Go there and fight.', 'alert'); if (dialogIsOpen()) journal(); return; }
   const foeSide = side === 'a' ? 'd' : 'a', from = foeSide === 'a' ? a : d, n = clamp(Math.ceil(from.people / 3), 2, 6);
   const kind = foeSide === 'a' ? WAR_FOES.raider : WAR_FOES.guard, leash = { x: d.x, y: d.y, r: 8 }, list = [];
@@ -543,7 +554,7 @@ function callForAid(ally, attacker) {
 function aidCost(ally) { return 15 + 5 * townBracket(ally.people); }
 function sendAid(id) {
   const a = townById(id), c = state.aid[id];
-  if (!a || !c) return;
+  if (!a || !c || !isAlly(id)) return;
   const cost = aidCost(a);
   if (state.coin < cost) { say('Supplies for ' + a.name + ' cost ' + cost + ' coin.', 'alert'); if (dialogIsOpen()) journal(); return; }
   state.coin -= cost; c.helped = true;
@@ -585,7 +596,7 @@ function worldTurn() {
   raidDeadline(); hostilityTurn(); aidTurn(); npcWarTurn();
   if (state.day <= 6) return;
   maybeStartNpcWar();
-  for (const s of settlements.filter(t => !t.owner)) {
+  for (const s of settlements.filter(t => !t.owner && !isAlly(t.id))) {
     if (Math.random() >= s.aggression * RAID_RATE) continue;
     const canRaidPlayer = !state.raid && (state.built.hut || state.built.longhouse) && Math.hypot(s.x - HOME.x, s.y - HOME.y) <= 100;
     if (canRaidPlayer) startRaid(s);

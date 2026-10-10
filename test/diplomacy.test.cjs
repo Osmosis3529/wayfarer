@@ -196,3 +196,13 @@ test('quests, deals, enemies and standing survive saving and loading', () => gam
   });
   assert.equal(r.deal.sell, 'wood'); assert.equal(r.hostile.length, 1); assert.deepEqual([r.quest.type, r.quest.kills], ['hunt', 1]); assert.equal(r.favor, 2); assert.equal(r.rivals.length, 1);
 }));
+
+test('giving up a job from the journal works wherever you stand, including at a settlement’s gate', () => game(async page => {
+  const r = await page.evaluate(() => {
+    RICH(); RIVALS(); const s = visit(0); takeQuest(s.id, 0); exitTown();            // standing on its tile outside
+    const here = inSettlement(s); journal(); const before = dialogText();
+    [...document.querySelectorAll('#dialog button')].find(b => b.textContent === 'Give up').click();
+    return { here, before: before.includes(s.name), quest: relOf(s.id).quest, after: dialogText(), open: dialogOpen() };
+  });
+  assert.equal(r.here, true); assert.equal(r.before, true); assert.equal(r.quest, null); assert.ok(r.open && r.after.includes('No jobs taken'), r.after);
+}));

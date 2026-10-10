@@ -236,7 +236,10 @@ const CTX_KEYS = ['built', 'assign', 'up', 'town', 'assignBackup', 'assignReady'
 function isColony(id) { return !!(state.colonies && state.colonies[id]); }
 function colonyIds() { return Object.keys(state.colonies || {}).filter(id => { const s = townById(id); return s && s.owner === 'player'; }); }
 function settleName() { return state.cur ? (townById(state.cur) || { name: 'the settlement' }).name : 'Brackenford'; }
-function npcVisit() { return !!state.visiting && !state.cur; }          // inside somebody else's settlement
+// Inside somebody else's settlement. Not 'state.cur is null': while the daily update has Brackenford swapped back in, you may still be standing in a colony.
+function npcVisit() { return !!state.visiting && !isColony(state.visiting); }
+// Citizens of a settlement: a colony keeps its own count in its record, which is always current.
+function peopleOf(s) { return isColony(s.id) ? state.colonies[s.id].town.people : s.people; }
 function makeColony(s) {
   if (!state.colonies) state.colonies = {};
   const built = {}; for (const k of Object.keys(BUILD_COSTS)) built[k] = false;
@@ -264,10 +267,10 @@ function ctxOut() {
 function withContext(id, fn) {
   id = id || null;
   if (id === state.cur) return fn();
-  const prev = state.cur;
+  const prev = state.cur, walking = townPeople;          // the citizens on the map belong to the place you are standing in
   if (prev) ctxOut();
   if (id) ctxIn(id);
-  try { return fn(); } finally { if (state.cur) ctxOut(); if (prev) ctxIn(prev); }
+  try { return fn(); } finally { if (state.cur) ctxOut(); if (prev) ctxIn(prev); townPeople = walking; }
 }
 function allRecords() { return [state.cur ? state.parked : state, ...Object.values(state.colonies || {})]; }
 function enterColony(id, quiet) {
@@ -285,10 +288,10 @@ function enterColony(id, quiet) {
 }
 
 // ---------------------------------------------------------------- the roads fast travel leaves on the overworld
-let roadCache = { n: -1, set: new Set() };
+let roadCache = { arr: null, n: -1, set: new Set() };
 function roadSet() {
   if (!Array.isArray(state.roads)) state.roads = [];
-  if (roadCache.n !== state.roads.length) roadCache = { n: state.roads.length, set: new Set(state.roads) };
+  if (roadCache.arr !== state.roads || roadCache.n !== state.roads.length) roadCache = { arr: state.roads, n: state.roads.length, set: new Set(state.roads) };
   return roadCache.set;
 }
 function isRoad(x, y) { return roadSet().has(y * WORLD_W + x); }
@@ -321,7 +324,7 @@ function addRoad(a, b) {
   const set = roadSet();
   let added = 0;
   for (const [x, y] of path) { const k = y * WORLD_W + x; if (!set.has(k)) { set.add(k); state.roads.push(k); added++; } }
-  roadCache = { n: state.roads.length, set };
+  roadCache = { arr: state.roads, n: state.roads.length, set };
   return added;
 }
 
@@ -383,7 +386,7 @@ function openMap() {
   ensureWarWorld();
   const here = hereSettlement();
   const rows = settlementList().map(s => {
-    const full = s.id === 'home' ? { people: state.town.people, aggression: 0 } : s, visited = isVisited(s);
+    const full = s.id === 'home' ? { people: (state.cur ? state.parked : state).town.people, aggression: 0 } : { ...s, people: peopleOf(s) }, visited = isVisited(s);
     const bits = [s.id === 'home' ? 'your home' : Math.round(Math.hypot(s.x - HOME.x, s.y - HOME.y)) + ' leagues from Brackenford'], war = state.wars[s.id];
     bits.push(full.people + ' citizens');
     if (s.id !== 'home') bits.push(moodOf(full), visited ? 'visited' : 'not visited yet', war ? 'at war: ' + war.left + ' defenders' : ownerText(s));

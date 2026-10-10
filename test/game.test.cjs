@@ -167,7 +167,9 @@ test('building buttons show the real costs and building deducts them', () => gam
 
 test('every town and site can be reached from home', () => game(async page => {
   const r = await page.evaluate(() => {
-    const k = mines[0];
+    // a mine whose ring of tiles holds no other site, so the water ring really is closed
+    const clearRing = m => { for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === 2 && 'SCDKM⌂'.includes(overworld[m.y + dy][m.x + dx])) return false; return true; };
+    const k = mines.find(clearRing) || mines[0];
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === 2 && !'SCDKM⌂'.includes(overworld[k.y + dy][k.x + dx])) overworld[k.y + dy][k.x + dx] = '≈';
     const walledOff = !reachableFromHome()[k.y][k.x];
     ensureReachable();
@@ -562,3 +564,24 @@ test('relics and the reveal survive saving, and old saves keep the old goal', ()
   });
   assert.deepEqual(r, { kept: true, legacyRevealed: true, legacyGlyph: 'K', guardians: 5 });
 }));
+
+test('the journal, a hall board and the caravan post fit a phone screen upright and sideways', async () => {
+  for (const viewport of [{ width: 390, height: 844 }, { width: 740, height: 360 }]) {
+    await phone(async page => {
+      const r = await page.evaluate(() => {
+        manualPause = true; const fit = () => { const d = document.getElementById('dialog').getBoundingClientRect(); return d.top >= 0 && d.bottom <= innerHeight && d.left >= 0 && d.right <= innerWidth; };
+        Object.assign(state.inv, { wood: 99, stone: 99 }); state.coin = 300; state.town.people = 12; build('hut'); build('longhouse'); build('caravanPost');
+        for (const s of settlements) { s.dislikes = []; s.discovered = true; }
+        const a = settlements[0]; a.people = 9; state.x = a.x; state.y = a.y; enterSettlement(a.id); closeDialog();
+        const hall = Object.entries(npcMap().plots).find(([, p]) => p.kind === 'hall')[0];
+        const out = {}; npcBuilding(hall); out.hall = fit(); closeDialog();
+        relOf(a.id).favor = 2; state.deals[a.id] = { sell: 'wood', buy: 'iron', gear: true, last: state.day, since: state.day, trips: 3, profit: 40 };
+        startNpcWar(settlements[1], a); startNpcWar(settlements[2], settlements[3]);
+        journal(); out.journal = fit(); out.scrolls = document.getElementById('dialog').scrollHeight > document.getElementById('dialog').clientHeight; closeDialog();
+        exitTown(); state.x = HOME.x + 2; state.y = HOME.y; interact(); out.caravan = fit(); closeDialog();
+        return out;
+      });
+      assert.deepEqual([r.hall, r.journal, r.caravan], [true, true, true], JSON.stringify(viewport) + ' ' + JSON.stringify(r));
+    }, viewport);
+  }
+});

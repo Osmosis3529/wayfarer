@@ -471,7 +471,7 @@ function mineDialog(key) { shopDialog(key, state.cur ? '' : '<h3>The shaft</h3><
 function exitToMine() { map = overworld; state.zone = 'overworld'; state.x = HOME.x; state.y = HOME.y; enterInstance(homeMine, 'mine'); }
 function barracksDialog(key) {
   const soldiers = crew('barracks');
-  showDialog('<h2>' + esc(bld(key)) + '</h2>' + staffBlock(key) + '<p>' + soldiers + ' of ' + state.town.people + ' citizens serve as soldiers. Assign more from the ' + esc(hallName().toLowerCase()) + '.</p>' + (soldiers && !state.cur ? escortControls('barracks') : '') +
+  showDialog('<h2>' + esc(bld(key)) + '</h2>' + staffBlock(key) + '<p>' + soldiers + ' of ' + state.town.people + ' citizens serve as soldiers. Assign more from the ' + esc(hallName().toLowerCase()) + '.' + (state.cur ? ' Here they only guard the streets: marching orders and the war council belong to Brackenford.' : '') + '</p>' + (soldiers && !state.cur ? escortControls('barracks') : '') +
     (state.cur ? '' : '<button onclick="warCouncil()">War council</button>') + '<button onclick="closeDialog()">Leave</button>');
 }
 function beaconDialog() { showDialog('<h2>' + esc(bld('beacon')) + '</h2><p>The Beacon stands lit over Brackenford.</p><button onclick="closeDialog()">Leave</button>'); }

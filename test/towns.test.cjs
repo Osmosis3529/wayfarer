@@ -408,3 +408,12 @@ test('inside another settlement: the lodge, mine and jeweler trade their goods, 
   assert.deepEqual(r.weapon, ['Hunter’s spear', r.price]); assert.equal(r.noDowngrade, 'Hunter’s spear'); assert.equal(r.maxHp, 5 + 4);
   assert.deepEqual(r.hp, [3, 1, 3]);        // +2 hearts; no second drink the same day; the next day it works again
 }));
+
+test('roads follow the world that is loaded, even when two saves have the same number of road tiles', () => game(async page => {
+  const r = await page.evaluate(() => {
+    state.roads = [100, 101, 102]; const first = isRoad(100 % WORLD_W, Math.floor(100 / WORLD_W)); const save = JSON.parse(JSON.stringify(buildSaveData()));
+    save.state.roads = [500, 501, 502]; hydrateWorld(save);
+    return { first, old: isRoad(100 % WORLD_W, Math.floor(100 / WORLD_W)), loaded: isRoad(500 % WORLD_W, Math.floor(500 / WORLD_W)) };
+  });
+  assert.deepEqual(r, { first: true, old: false, loaded: true });
+}));
