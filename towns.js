@@ -22,7 +22,14 @@ const seededRng = seed => { let a = seed >>> 0; return () => { a = (a + 0x6D2B79
 const NPC_BRACKETS = [{ w: 34, rows: 2 }, { w: 42, rows: 3 }, { w: 50, rows: 3 }, { w: 58, rows: 4 }, { w: 66, rows: 4 }];
 function townBracket(people) { return Math.max(0, Math.min(4, Math.floor((people - 2) / 3))); }
 const HALL_TITLES = ['Moot house', 'Hall', 'Town hall', 'Guildhall', 'City hall'];
-const NPC_KIND_NAMES = { market: 'Market', inn: 'Inn', travel: 'Caravan post', house: 'Home' };
+const NPC_KIND_NAMES = { market: 'Market', inn: 'Inn', travel: 'Caravan post', house: 'Home', well: 'Well', huntersLodge: 'Hunters’ lodge', smithy: 'Smithy', jeweler: 'Jeweler', mine: 'Mine' };
+// Bigger settlements have more to use: every one has a well, and the lodge, smithy, jeweler and mine come with size.
+const NPC_EXTRAS = [['well', 0], ['huntersLodge', 1], ['smithy', 2], ['jeweler', 3], ['mine', 3]];
+const NPC_SHOPS = {
+  huntersLodge: { buy: ['furs', 'berries'], sell: ['furs', 'berries'] },
+  mine: { buy: ['stone', 'copper', 'iron'], sell: ['stone', 'copper', 'iron'] },
+  jeweler: { buy: ['gems', 'silver', 'gold'], sell: ['gems', 'silver', 'gold', 'relic'] }
+};
 
 function buildNpcTown(s) {
   const b = townBracket(s.people), { w, rows } = NPC_BRACKETS[b], h = 7 + 6 * rows;
@@ -47,7 +54,8 @@ function buildNpcTown(s) {
   slots.sort((p, q) => dist(p) - dist(q) || p.x0 - q.x0);
   const essentials = ['market', 'hall', 'inn', 'travel'], turn = Math.floor(rnd() * 4), kinds = [];
   for (let i = 0; i < 4; i++) kinds.push(essentials[(i + turn) % 4]);
-  const houses = Math.min(slots.length - 4, Math.ceil(s.people * 0.9));
+  for (const [k, from] of NPC_EXTRAS) if (b >= from) kinds.push(k);
+  const houses = Math.min(slots.length - kinds.length, Math.ceil(s.people * 0.9));
   for (let i = 0; i < houses; i++) kinds.push('house');
   const plots = {};
   kinds.forEach((kind, i) => {
@@ -109,9 +117,69 @@ function npcBuilding(key) {
   if (!p) return;
   if (p.kind === 'market') trade(s.id);
   else if (p.kind === 'inn') innDialog(s);
-  else if (p.kind === 'travel') openMap();
+  else if (p.kind === 'travel') npcCaravan(s);
   else if (p.kind === 'hall') npcHallDialog(s);
+  else if (NPC_SHOPS[p.kind]) npcShop(s, p.kind);
+  else if (p.kind === 'smithy') npcSmithy(s);
+  else if (p.kind === 'well') npcWell(s);
   else houseDialog(s, p);
+}
+function relOf(id) { if (!state.rel) state.rel = {}; return state.rel[id] || (state.rel[id] = { favor: 0, done: 0, quest: null, wellDay: 0 }); }
+function npcCaravan(s) {
+  showDialog('<h2>' + swatch(s.id) + esc(s.name) + ' caravan post</h2><p>Wagons come and go from here. Ride to any settlement you have visited, or look at the world map.</p><button onclick="openMap()">World map and fast travel</button><button onclick="closeDialog()">Leave</button>');
+}
+function npcShop(s, kind) {
+  ensureWarWorld();
+  if (state.wars[s.id]) { warDialog(s.id); return; }
+  const g = NPC_SHOPS[kind], row = (side, k) => '<button onclick="npcShopAction(\'' + s.id + '\',\'' + kind + '\',\'' + side + '\',\'' + k + '\')">' + (side === 'buy' ? 'Buy ' : 'Sell ') + itemNames[k] + ' · ' + regionPrice(s, k, side) + ' coin</button>';
+  showDialog('<h2>' + swatch(s.id) + esc(s.name) + ' · ' + esc(NPC_KIND_NAMES[kind]) + '</h2><p>' + esc(regionNote(s) || '') + '</p><h3>Buy</h3>' + g.buy.map(k => row('buy', k)).join('') + '<h3>Sell</h3>' + g.sell.map(k => row('sell', k)).join('') + '<button onclick="closeDialog()">Leave</button>');
+}
+function npcShopAction(id, kind, side, item) {
+  const s = townById(id);
+  if (!s || !inSettlement(s) || !NPC_SHOPS[kind] || !NPC_SHOPS[kind][side].includes(item)) return;
+  if (side === 'buy') {
+    const price = regionPrice(s, item, 'buy');
+    if (state.coin < price) say('You need ' + price + ' coin for that.', 'alert');
+    else if (roomFor(item) < 1) say('You cannot carry more ' + itemNames[item].toLowerCase() + ' (' + supplyCap() + ').', 'alert');
+    else { state.coin -= price; addItem(item, 1, true); unlockByMaterial(item); say(s.name + ' sells you ' + itemNames[item].toLowerCase() + ' for ' + price + ' coin.', 'gold'); }
+  } else if (!state.inv[item]) say('You have no ' + itemNames[item].toLowerCase() + ' to sell.', 'alert');
+  else { const price = regionPrice(s, item, 'sell'); state.inv[item]--; state.coin += price; say(s.name + ' buys ' + itemNames[item].toLowerCase() + ' for ' + price + ' coin.', 'gold'); }
+  render(); npcShop(s, kind);
+}
+// A smith's best work depends on the size of the settlement.
+function smithTier(s) { return Math.min(4, townBracket(s.people) + 1); }
+function gearPrice(s, tier) { return Math.round([20, 45, 80, 140][tier - 1] * (1 + 0.1 * (s.bias || 0))); }
+function gearRows(s, top) {
+  const rows = [];
+  for (const slot of ['weapon', 'armor']) for (let t = 1; t <= top; t++) {
+    const g = GEAR[slot][t - 1], better = slot === 'weapon' ? g.damage > state.equipped.weapon.damage : g.health > state.equipped.armor.health, price = gearPrice(s, t);
+    rows.push({ slot, tier: t, gear: g, better, price, label: g.name + ' · ' + (slot === 'weapon' ? '+' + g.damage + ' damage' : '+' + g.health + ' hearts') });
+  }
+  return rows;
+}
+function npcSmithy(s) {
+  const rows = gearRows(s, smithTier(s)).map(r => '<button ' + (r.better && state.coin >= r.price ? '' : 'disabled') + ' onclick="buyGear(\'' + s.id + '\',\'' + r.slot + '\',' + r.tier + ')">' + esc(r.label) + ' · ' + r.price + ' coin' + (r.better ? '' : ' (no better than yours)') + '</button>').join('');
+  showDialog('<h2>' + swatch(s.id) + esc(s.name) + ' smithy</h2><p>The smith sells finished weapons and armor. You wear a ' + esc(state.equipped.weapon.name) + ' (+' + state.equipped.weapon.damage + ') and ' + esc(state.equipped.armor.name) + ' (+' + state.equipped.armor.health + ').</p>' + rows + '<button onclick="closeDialog()">Leave</button>');
+}
+function buyGear(id, slot, tier) {
+  const s = townById(id);
+  if (!s || !inSettlement(s) || tier < 1 || tier > smithTier(s) || !GEAR[slot]) return;
+  const g = GEAR[slot][tier - 1], price = gearPrice(s, tier);
+  if (state.coin < price) { say('The smith wants ' + price + ' coin.', 'alert'); npcSmithy(s); return; }
+  if (!equipGear(slot, g)) { say('That is no better than what you wear.', 'alert'); npcSmithy(s); return; }
+  state.coin -= price; say('You buy ' + g.name + ' for ' + price + ' coin and put it on.', 'gold');
+  render(); npcSmithy(s);
+}
+function npcWell(s) {
+  const r = relOf(s.id), heal = 2;
+  showDialog('<h2>' + swatch(s.id) + esc(s.name) + ' well</h2><p>Cool, clean water, free to travelers. It restores ' + heal + ' hearts, once a day in each settlement.</p><button onclick="drinkNpcWell(\'' + s.id + '\')">Drink · heal ' + heal + ' hearts</button><button onclick="closeDialog()">Leave</button>');
+}
+function drinkNpcWell(id) {
+  const s = townById(id);
+  if (!s || !inSettlement(s)) return;
+  const r = relOf(id);
+  if (r.wellDay === state.day) { say('The bucket needs time to refill (once a day).', 'alert'); render(); return; }
+  r.wellDay = state.day; state.hp = Math.min(state.maxHp, state.hp + 2); say('Cool water restores your strength.', 'gold'); render(); closeDialog();
 }
 function innDialog(s) {
   const cost = 5 + (s.bias || 0);
@@ -154,8 +222,9 @@ function renderVisitPanel() {
     '<div class="town-metric">Mood<b>' + moodOf(s) + '</b></div>' +
     '<div class="town-metric">Distance<b>' + Math.round(Math.hypot(s.x - HOME.x, s.y - HOME.y)) + ' leagues</b></div>' +
     '<div class="town-metric">Ruler<b>' + esc(owner || 'its own people') + '</b></div>';
-  document.getElementById('townfolk').innerHTML = ['market', 'inn', 'travel', 'hall'].map(k => { const p = plots.find(q => q.kind === k); return p ? '<div class="town-person"><b>' + esc(p.name) + '</b><span>' + ({ market: 'trade goods', inn: 'rest for coin', travel: 'world map and fast travel', hall: 'news and war' })[k] + '</span></div>' : ''; }).join('') + '<div class="town-person"><b>' + plots.filter(p => p.kind === 'house').length + ' homes</b><span>' + s.people + ' citizens live here</span></div>';
-  document.getElementById('town-hint').textContent = 'Walk into a door to go in, or into a citizen to talk. The market trades regional goods, the inn restores your hearts, the caravan post opens the world map (fast travel is arranged from any settlement you have visited), and the hall lets you declare war. The town grows and shrinks as its people do, and its map with it.';
+  const uses = { market: 'trade goods', inn: 'rest for coin', travel: 'world map and fast travel', hall: 'news and war', well: 'free healing', huntersLodge: 'furs and game', smithy: 'weapons and armor', jeweler: 'gems, silver and gold', mine: 'stone and ore' };
+  document.getElementById('townfolk').innerHTML = ['market', 'inn', 'travel', 'hall', 'well', 'huntersLodge', 'smithy', 'jeweler', 'mine'].map(k => { const p = plots.find(q => q.kind === k); return p ? '<div class="town-person"><b>' + esc(p.name) + '</b><span>' + uses[k] + '</span></div>' : ''; }).join('') + '<div class="town-person"><b>' + plots.filter(p => p.kind === 'house').length + ' homes</b><span>' + s.people + ' citizens live here</span></div>';
+  document.getElementById('town-hint').textContent = 'Walk into a door to go in, or into a citizen to talk. The market trades regional goods, the inn restores your hearts, the caravan post opens the world map (fast travel is arranged from any settlement you have visited), the hall lets you declare war, and bigger settlements also have a well, a hunters’ lodge, a smithy, a jeweler and a mine. The town grows and shrinks as its people do, and its map with it.';
 }
 
 // ---------------------------------------------------------------- the roads fast travel leaves on the overworld
