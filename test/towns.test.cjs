@@ -224,13 +224,13 @@ test('a settlement at war shuts its gates, and declaring war from its hall puts 
   assert.equal(r.out.blocked.zone, 'overworld'); assert.ok(r.out.blocked.dialog.includes('at war'), r.out.blocked.dialog);
 }));
 
-test('an annexed settlement can still be walked into, and says whose banner it flies', () => game(async page => {
+test('an annexed settlement says whose banner it flies, and is shown as yours on the world map', () => game(async page => {
   const r = await page.evaluate(() => {
-    const [s] = discover(1); s.owner = 'player'; state.x = s.x; state.y = s.y; interact();
-    const t = npcMap(), hall = Object.entries(t.plots).find(([, p]) => p.kind === 'hall')[0]; npcBuilding(hall);
-    return { zone: state.zone, hall: dialogText(), panel: document.getElementById('town-stats').textContent };
+    const [s] = discover(1); s.owner = 'player'; ensureWarWorld(); state.visited[s.id] = true;
+    state.x = HOME.x; state.y = HOME.y; enterTown(); openMap(); const map = dialogText();
+    return { owner: ownerText(s), standing: standingText(s), map, colony: isColony(s.id) };
   });
-  assert.equal(r.zone, 'town'); assert.ok(r.hall.includes('annexed by Brackenford'), r.hall); assert.ok(r.panel.includes('annexed by Brackenford'), r.panel);
+  assert.equal(r.owner, 'annexed by Brackenford'); assert.equal(r.standing, 'yours'); assert.ok(r.map.includes('annexed by Brackenford'), r.map); assert.equal(r.colony, true);
 }));
 
 test('fast travel costs more the farther you go, needs a visited settlement and enough coin, and arrives inside', () => game(async page => {

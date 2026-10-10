@@ -102,6 +102,8 @@ function enterSettlement(id, quiet) {
   if (!s) return;
   ensureWarWorld();
   if (state.wars[id]) { if (state.wars[id].cleared) annex(id); else { warDialog(id); return; } }
+  if (s.owner === 'player' && isColony(id)) { enterColony(id, quiet); return; }
+  if (state.cur) ctxOut();
   state.visiting = id; state.visited[id] = true; npcCurrent = null; townPeople = []; townPathCache.clear();
   state.zone = 'town'; state.site = null; state.returnPoint = null; state.view = 'explore';
   const t = npcMap(); map = t.grid; state.x = t.start[0]; state.y = t.start[1];
@@ -109,7 +111,7 @@ function enterSettlement(id, quiet) {
   if (!quiet) say('You walk into ' + s.name + ', a ' + SIZE_NAMES[t.bracket].toLowerCase() + ' of ' + s.people + ' citizens. Walk into a door to go in, and into a citizen to talk.', 'gold');
   render();
 }
-function townTitle() { return state.visiting ? townById(state.visiting).name + ' · ' + SIZE_NAMES[npcMap().bracket] : 'Brackenford · ' + hallName(); }
+function townTitle() { return npcVisit() ? townById(state.visiting).name + ' · ' + SIZE_NAMES[npcMap().bracket] : settleName() + ' · ' + hallName(); }
 function exitLabel() { return 'Leave ' + (state.visiting ? townById(state.visiting).name : 'Brackenford'); }
 
 // ---------------------------------------------------------------- its buildings
@@ -222,6 +224,62 @@ function renderVisitPanel() {
   document.getElementById('town-hint').textContent = 'Walk into a door to go in, or into a citizen to talk. The market trades regional goods, the inn restores your hearts, the caravan post opens the world map (fast travel is arranged from any settlement you have visited), the hall lets you declare war, and bigger settlements also have a well, a hunters’ lodge, a smithy, a jeweler and a mine. The town grows and shrinks as its people do, and its map with it.';
 }
 
+// ---------------------------------------------------------------- annexed settlements, run like Brackenford
+// A settlement you take is managed with the same dialogs and rules as Brackenford. While you are inside it, the
+// fields that make up a settlement (buildings, jobs, upgrades, pantry, tier) are swapped for its own; your pack, coin
+// and gear are shared. Everything else in the game keeps reading state.built, state.assign and so on as usual.
+const CTX_KEYS = ['built', 'assign', 'up', 'town', 'assignBackup', 'assignReady', 'starving'];
+function isColony(id) { return !!(state.colonies && state.colonies[id]); }
+function colonyIds() { return Object.keys(state.colonies || {}).filter(id => { const s = townById(id); return s && s.owner === 'player'; }); }
+function settleName() { return state.cur ? (townById(state.cur) || { name: 'the settlement' }).name : 'Brackenford'; }
+function npcVisit() { return !!state.visiting && !state.cur; }          // inside somebody else's settlement
+function makeColony(s) {
+  if (!state.colonies) state.colonies = {};
+  const built = {}; for (const k of Object.keys(BUILD_COSTS)) built[k] = false;
+  state.colonies[s.id] = { built, assign: {}, up: {}, town: { people: Math.max(2, Math.floor(s.people) || 2), food: 4, tier: 1 }, assignBackup: null, assignReady: false, starving: false };
+}
+function ensureColonies() {
+  if (!state.colonies || typeof state.colonies !== 'object') state.colonies = {};
+  for (const s of settlements) if (s.owner === 'player' && !isColony(s.id)) makeColony(s);
+  for (const id of Object.keys(state.colonies)) if (!townById(id) || townById(id).owner !== 'player') delete state.colonies[id];
+}
+function ctxIn(id) {
+  const rec = state.colonies[id];
+  state.parked = {}; for (const k of CTX_KEYS) state.parked[k] = state[k];
+  for (const k of CTX_KEYS) state[k] = rec[k];
+  state.cur = id;
+}
+function ctxOut() {
+  const rec = state.colonies[state.cur], s = townById(state.cur);
+  for (const k of CTX_KEYS) rec[k] = state[k];
+  if (s) s.people = rec.town.people;
+  for (const k of CTX_KEYS) state[k] = state.parked[k];
+  state.parked = null; state.cur = null;
+}
+// Runs fn as the given settlement (null is Brackenford) and puts everything back afterwards.
+function withContext(id, fn) {
+  id = id || null;
+  if (id === state.cur) return fn();
+  const prev = state.cur;
+  if (prev) ctxOut();
+  if (id) ctxIn(id);
+  try { return fn(); } finally { if (state.cur) ctxOut(); if (prev) ctxIn(prev); }
+}
+function allRecords() { return [state.cur ? state.parked : state, ...Object.values(state.colonies || {})]; }
+function enterColony(id, quiet) {
+  const s = townById(id);
+  if (!s || !isColony(id)) return;
+  if (state.cur) ctxOut();
+  ctxIn(id);
+  ensureSettlementState();
+  state.visiting = id; state.visited[id] = true; townPeople = []; townPathCache.clear();
+  state.zone = 'town'; state.site = null; state.returnPoint = null; state.view = 'explore';
+  map = brackenfordMap(); state.x = TOWN_START[0]; state.y = TOWN_START[1];
+  syncTownPeople();
+  if (!quiet) say('You walk into ' + s.name + ', your own settlement. Run it as you run Brackenford: build, give jobs, buy upgrades. Your pack and coin are shared.', 'gold');
+  render();
+}
+
 // ---------------------------------------------------------------- the roads fast travel leaves on the overworld
 let roadCache = { n: -1, set: new Set() };
 function roadSet() {
@@ -290,7 +348,7 @@ function travelTo(id) {
   state.coin -= cost;
   const road = addRoad(here, dest);
   closeDialog();
-  if (state.zone === 'town') { map = overworld; state.zone = 'overworld'; state.visiting = null; townPeople = []; }
+  if (state.zone === 'town') { if (state.cur) ctxOut(); map = overworld; state.zone = 'overworld'; state.visiting = null; townPeople = []; }
   if (dest.id === 'home') enterTown(true); else enterSettlement(dest.id, true);
   say('You ride from ' + here.name + ' to ' + dest.name + ' for ' + cost + ' coin' + (road ? ', and the road between them is now marked on your map.' : '.'), 'gold');
   render();

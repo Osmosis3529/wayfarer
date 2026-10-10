@@ -24,6 +24,7 @@ function ensureWarWorld() {
     if (!('owner' in s)) s.owner = null;
   }
   ensureRivalries();
+  ensureColonies();
 }
 function annexedCount() { return settlements.filter(s => s.owner === 'player').length; }
 function moodOf(s) { return s.aggression < 0.12 ? 'peaceful' : s.aggression < 0.3 ? 'wary' : 'hostile'; }
@@ -293,6 +294,7 @@ function warDialog(id) {
     '<button ' + (state.coin >= peaceCost(id) ? '' : 'disabled') + ' onclick="sueForPeace(\'' + id + '\')">Make peace · ' + peaceCost(id) + ' coin</button><button onclick="closeDialog()">Leave</button>');
 }
 function warCouncil() {
+  if (state.cur) { say('The war council meets in Brackenford.', 'alert'); return; }
   ensureWarWorld(); ensureSettlementState();
   const known = settlements.filter(s => s.discovered);
   const rows = known.map(s => {
@@ -450,7 +452,7 @@ function endNpcWar(w, winnerId, how) {
   if (how === 'draw') { if (known) say('The war between ' + win.name + ' and ' + lose.name + ' fizzles out; both sides are bled and neither is beaten.'); return; }
   for (const [k, n] of Object.entries(loot)) { stockOf(win)[k] = Math.min(60, (stockOf(win)[k] || 0) + n); if (n) parts.push(n + ' ' + itemNames[k].toLowerCase()); }
   respawnSettlement(lose);
-  win.people = Math.min((win.cap || 8) + 3, win.people + 1);
+  win.people = Math.max(win.people, Math.min((win.cap || 8) + 3, win.people + 1));      // victors take in a few of the vanquished, but never shrink
   if (known) say(win.name + ' has won the war against ' + lose.name + (parts.length ? ' and carries off ' + parts.join(', ') : '') + '. ' + lose.name + ' is left in ruins; two survivors start again.', isAlly(lose.id) ? 'alert' : 'gold');
   if (w.you) {
     const mine = (w.you === 'a') === (winnerId === w.a);

@@ -204,8 +204,15 @@ test('a siege: every defender and building must fall, the gates stay shut until 
     const spots = houses.map(h => h.k).sort().join(); state.x = HOME.x + 10; state.y = HOME.y;
     for (let i = 0; i < 8; i++) moveEnemies(); const still = foeBox().filter(f => f.e.building).map(f => f.k).sort().join() === spots;
     // a house is fought by walking into it, in the ordinary battle
-    const h0 = houses[0]; state.x = h0.x - 1; state.y = h0.y; clearRect(state.x, state.y, state.x, state.y); enemyContact(); const noAmbush = !state.combat;
-    move(1, 0); const fighting = !!state.combat && state.combat.enemy.building; const panel = dialogText(); state.combat.hp = 1; battleAction('attack');
+    const taken = new Set(foes.map(f => f.k)); let pick = null;       // an approach tile with no other foe beside it, so only the house is in play
+    for (const h of houses) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      const sx = h.x + dx, sy = h.y + dy;
+      if (pick || taken.has(sx + ',' + sy)) continue;
+      if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => (sx + a !== h.x || sy + b !== h.y) && taken.has((sx + a) + ',' + (sy + b)))) continue;
+      pick = { h, sx, sy, dx: -dx, dy: -dy };
+    }
+    const h0 = pick.h; state.x = pick.sx; state.y = pick.sy; clearRect(state.x, state.y, state.x, state.y); enemyContact(); const noAmbush = !state.combat;
+    move(pick.dx, pick.dy); const fighting = !!state.combat && state.combat.enemy.building; const panel = dialogText(); state.combat.hp = 1; battleAction('attack');
     const afterHouse = { holds: state.wars[s.id].holds, guards: state.wars[s.id].guards, left: state.wars[s.id].left };
     // the rest through the same bookkeeping soldiers and fights use
     const rest = foes.filter(f => f !== h0); const last = rest.pop();
@@ -214,13 +221,13 @@ test('a siege: every defender and building must fall, the gates stay shut until 
     removeEnemyData(overworld, last.x, last.y); overworld[last.y][last.x] = '.'; noteKill(last.e);
     const cleared = { cleared: state.wars[s.id].cleared, left: state.wars[s.id].left, people: s.people, owner: s.owner, log: state.log[0].t };
     state.x = s.x; state.y = s.y; closeDialog(); interact();
-    return { total: foes.length, houses: houses.length, guards: guards.length, shut, still, noAmbush, fighting, panel, afterHouse, open, cleared, claimed: { owner: s.owner, people: s.people, war: state.wars[s.id], hostile: state.hostile[s.id], zone: state.zone, visiting: state.visiting, coin: state.coin - before.coin, annexed: annexedCount() }, before };
+    return { total: foes.length, houses: houses.length, guards: guards.length, shut, still, noAmbush, fighting, panel, afterHouse, open, cleared, claimed: { owner: s.owner, people: s.people, cur: state.cur, colony: isColony(s.id), war: state.wars[s.id], hostile: state.hostile[s.id], zone: state.zone, visiting: state.visiting, coin: state.coin - before.coin, annexed: annexedCount() }, before };
   });
   assert.deepEqual(r.shut, { zone: 'overworld', dialog: true }); assert.equal(r.still, true); assert.equal(r.noAmbush, true); assert.equal(r.fighting, true); assert.ok(r.panel.includes('Barricaded House'), r.panel);
   assert.deepEqual(r.afterHouse, { holds: r.houses - 1, guards: r.guards, left: r.total - 1 });
   assert.equal(r.open.cleared, false); assert.equal(r.open.left, 1); assert.equal(r.open.owner, null);
   assert.equal(r.cleared.cleared, true); assert.equal(r.cleared.left, 0); assert.equal(r.cleared.people, 0); assert.equal(r.cleared.owner, null); assert.ok(r.cleared.log.includes('Walk into'), r.cleared.log);
-  assert.equal(r.claimed.owner, 'player'); assert.equal(r.claimed.people, 2); assert.equal(r.claimed.war, undefined); assert.equal(r.claimed.hostile, undefined); assert.equal(r.claimed.zone, 'town'); assert.equal(r.claimed.annexed, 1);
+  assert.equal(r.claimed.owner, 'player'); assert.equal(r.claimed.people, 2); assert.equal(r.claimed.war, undefined); assert.equal(r.claimed.hostile, undefined); assert.equal(r.claimed.zone, 'town'); assert.equal(r.claimed.annexed, 1); assert.equal(r.claimed.colony, true); assert.ok(r.claimed.cur, 'you are inside it, running it');
   assert.ok(r.claimed.coin >= 20 + r.before.size * 3, JSON.stringify(r.claimed));
 }));
 
@@ -308,7 +315,8 @@ test('settlements go to war: citizens die and buildings burn, nobody is annexed,
     const real = Math.random; Math.random = () => 0.9;
     let days = 0; try { while (state.npcWars.includes(w) && days < 20) { state.day++; npcWarTurn(); days++; } } finally { Math.random = real; }
     const plots = Object.keys(buildNpcTown(b).plots).length;
-    state.day += 1; const regrown = []; for (let i = 0; i < 12; i++) { worldTurn(); regrown.push(Object.keys(buildNpcTown(b).plots).length); }
+    // before day 7 the world starts no new wars, so only the rebuilding is measured
+    state.day = 5; const regrown = []; for (let i = 0; i < 30; i++) { worldTurn(); regrown.push(Object.keys(buildNpcTown(b).plots).length); }
     return { listed, over: !state.npcWars.includes(w), days, a: [a.people, a.owner], b: [b.people, b.owner, b.wreck], plots, loot: { gems: a.stock.gems, gold: a.stock.gold }, emptied: Object.keys(b.stock).length, regrown, news: state.log.some(l => l.t.includes('has won the war')) };
   });
   assert.equal(r.listed, 1); assert.equal(r.over, true); assert.ok(r.days >= 1 && r.days <= 8, 'days ' + r.days);

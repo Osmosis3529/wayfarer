@@ -173,13 +173,13 @@ test('wars start on their own, between rivals most often, never involve annexed 
 
 test('a ruined settlement shows fewer buildings, can still be entered, and recovers over days', () => game(async page => {
   const r = await page.evaluate(() => {
-    setAlone(); const s = settlements[0]; s.discovered = true; s.people = 8; s.wreck = 0;
+    setAlone(); state.day = 5; const s = settlements[0]; s.discovered = true; s.people = 8; s.wreck = 0;      // before day 7 the world starts no new wars
     const total = Object.keys(buildNpcTown(s).plots).length;
     s.wreck = 3; const three = Object.keys(buildNpcTown(s).plots).length;
     respawnSettlement(s); const none = Object.keys(buildNpcTown(s).plots).length;
     state.x = s.x; state.y = s.y; enterSettlement(s.id); const inside = state.zone === 'town', people = townPeople.length;
     renderMap(); document.getElementById('town-panel').classList.contains('visible');
-    exitTown(); state.day = 10; const grown = []; for (let i = 0; i < 15; i++) { worldTurn(); grown.push(Object.keys(buildNpcTown(s).plots).length); }
+    exitTown(); state.day = 5; const grown = []; for (let i = 0; i < 30; i++) { worldTurn(); grown.push(Object.keys(buildNpcTown(s).plots).length); }
     return { total, three, none, inside, people, grown, wreck: s.wreck };
   });
   assert.equal(r.three, r.total - 3); assert.equal(r.none, 0); assert.equal(r.inside, true); assert.ok(r.people >= 2);
