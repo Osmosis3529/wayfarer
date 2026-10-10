@@ -224,13 +224,13 @@ test('a settlement at war shuts its gates, and declaring war from its hall puts 
   assert.equal(r.out.blocked.zone, 'overworld'); assert.ok(r.out.blocked.dialog.includes('at war'), r.out.blocked.dialog);
 }));
 
-test('an annexed settlement can still be walked into, and says whose banner it flies', () => game(async page => {
+test('an annexed settlement says whose banner it flies, and is shown as yours on the world map', () => game(async page => {
   const r = await page.evaluate(() => {
-    const [s] = discover(1); s.owner = 'player'; state.x = s.x; state.y = s.y; interact();
-    const t = npcMap(), hall = Object.entries(t.plots).find(([, p]) => p.kind === 'hall')[0]; npcBuilding(hall);
-    return { zone: state.zone, hall: dialogText(), panel: document.getElementById('town-stats').textContent };
+    const [s] = discover(1); s.owner = 'player'; ensureWarWorld(); state.visited[s.id] = true;
+    state.x = HOME.x; state.y = HOME.y; enterTown(); openMap(); const map = dialogText();
+    return { owner: ownerText(s), standing: standingText(s), map, colony: isColony(s.id) };
   });
-  assert.equal(r.zone, 'town'); assert.ok(r.hall.includes('annexed by Brackenford'), r.hall); assert.ok(r.panel.includes('annexed by Brackenford'), r.panel);
+  assert.equal(r.owner, 'annexed by Brackenford'); assert.equal(r.standing, 'yours'); assert.ok(r.map.includes('annexed by Brackenford'), r.map); assert.equal(r.colony, true);
 }));
 
 test('fast travel costs more the farther you go, needs a visited settlement and enough coin, and arrives inside', () => game(async page => {
@@ -339,4 +339,81 @@ test('visited settlements, roads and the settlement you are inside survive savin
   assert.equal(r.loaded.zone, 'town'); assert.notEqual(r.loaded.visiting, null); assert.equal(r.loaded.onTown, true); assert.deepEqual(r.loaded.pos, r.loaded.expected);
   assert.equal(r.loaded.people, r.loaded.expectedPeople); assert.equal(r.loaded.roads, true); assert.equal(r.loaded.visited.length, 1);
   assert.deepEqual(r.defaults, { visited: [], roads: 0, visiting: null }); assert.deepEqual(r.lost, { zone: 'town', visiting: null, onBrackenford: true });
+}));
+
+test('the market, mine, jeweler, hunters’ lodge, blacksmith, well and caravan post can be used from their marks on the overworld', () => game(async page => {
+  const r = await page.evaluate(() => {
+    Object.assign(state.inv, { wood: 9999, stone: 9999, iron: 999, furs: 999, silver: 999, gold: 999, gems: 999 }); state.unlocked = { smithy: true, huntersLodge: true, jeweler: true }; state.town.people = 40;
+    const keys = ['market', 'mine', 'jeweler', 'huntersLodge', 'smithy', 'well', 'caravanPost', 'garden', 'lumberMill'];
+    for (const k of keys) build(k);
+    const out = {};
+    for (const k of keys) {
+      const mark = BUILDING_MARKS.find(b => b.key === k);
+      state.x = HOME.x + mark.dx; state.y = HOME.y + mark.dy; closeDialog(); render();
+      const button = document.getElementById('actions').textContent.includes('Use the ');
+      interact();
+      out[k] = [dialogOpen(), button, dialogOpen() ? dialogText().slice(0, 30) : ''];
+      closeDialog();
+    }
+    return out;
+  });
+  for (const k of ['market', 'mine', 'jeweler', 'huntersLodge', 'smithy', 'well', 'caravanPost']) assert.deepEqual(r[k].slice(0, 2), [true, true], k + ' ' + JSON.stringify(r[k]));
+  assert.ok(r.market[2].includes('Market') && r.mine[2].includes('Mine') && r.well[2].includes('Well') && r.caravanPost[2].includes('Caravan post'), JSON.stringify(r));
+  assert.deepEqual(r.garden.slice(0, 2), [false, false]); assert.deepEqual(r.lumberMill.slice(0, 2), [false, false]);   // those stay inside the settlement
+}));
+
+test('bigger settlements have more to use: every one a well, then a lodge, a smithy, a jeweler and a mine', () => game(async page => {
+  const r = await page.evaluate(() => {
+    const s = discover(1)[0], out = {}, problems = [];
+    for (const people of [3, 6, 9, 12, 15]) {
+      s.people = people; npcCurrent = null; state.visiting = s.id; state.zone = 'town';
+      const t = npcMap(); map = t.grid; state.x = t.start[0]; state.y = t.start[1];
+      const reach = townReach(state.x, state.y), kinds = Object.values(t.plots).map(p => p.kind);
+      out[people] = ['well', 'huntersLodge', 'smithy', 'jeweler', 'mine', 'market', 'inn', 'travel', 'hall'].filter(k => kinds.includes(k));
+      for (const [k, p] of Object.entries(t.plots)) if (!reach.has(p.front[0] + ',' + p.front[1])) problems.push(people + ':' + p.kind + ' unreachable');
+    }
+    return { out, problems };
+  });
+  assert.deepEqual(r.problems, []);
+  const core = ['market', 'inn', 'travel', 'hall'];
+  assert.deepEqual(r.out[3], ['well', ...core].sort((a, b) => ['well', 'market', 'inn', 'travel', 'hall'].indexOf(a) - ['well', 'market', 'inn', 'travel', 'hall'].indexOf(b)));
+  assert.deepEqual(r.out[6], ['well', 'huntersLodge', ...core]);
+  assert.deepEqual(r.out[9], ['well', 'huntersLodge', 'smithy', ...core]);
+  assert.deepEqual(r.out[12], ['well', 'huntersLodge', 'smithy', 'jeweler', 'mine', ...core]);
+  assert.deepEqual(r.out[15], r.out[12]);
+}));
+
+test('inside another settlement: the lodge, mine and jeweler trade their goods, the smith sells gear, and the well heals once a day', () => game(async page => {
+  const r = await page.evaluate(() => {
+    const s = discover(1)[0]; s.people = 13; state.x = s.x; state.y = s.y; enterSettlement(s.id); closeDialog();
+    const door = kind => { const [k, p] = Object.entries(npcMap().plots).find(([, q]) => q.kind === kind); return k; };
+    state.coin = 300; state.inv.furs = 0; state.hp = 1; state.maxHp = 5;
+    npcBuilding(door('huntersLodge')); const lodge = dialogText(); npcShopAction(s.id, 'huntersLodge', 'buy', 'furs'); const furs = state.inv.furs;
+    npcShopAction(s.id, 'huntersLodge', 'sell', 'furs'); const sold = state.inv.furs;
+    npcShopAction(s.id, 'huntersLodge', 'buy', 'gems'); const wrongGood = state.inv.gems;     // a lodge does not deal in gems
+    closeDialog(); npcBuilding(door('jeweler')); const jewel = dialogText();
+    closeDialog(); npcBuilding(door('mine')); const mine = dialogText();
+    closeDialog(); npcBuilding(door('smithy')); const smithy = dialogText();
+    const top = smithTier(s), coin0 = state.coin; buyGear(s.id, 'weapon', 2); const weapon = [state.equipped.weapon.name, coin0 - state.coin];
+    buyGear(s.id, 'weapon', 1); const noDowngrade = state.equipped.weapon.name;
+    buyGear(s.id, 'armor', 4); const maxHp = state.maxHp;
+    closeDialog(); npcBuilding(door('well')); state.hp = 1; drinkNpcWell(s.id); const hp1 = state.hp; state.hp = 1; drinkNpcWell(s.id); const hp2 = state.hp;
+    state.day++; drinkNpcWell(s.id); const hp3 = state.hp;
+    return { lodge, furs, sold, wrongGood, jewel, mine, smithy, top, weapon, noDowngrade, maxHp, hp: [hp1, hp2, hp3], price: gearPrice(s, 2) };
+  });
+  assert.ok(r.lodge.includes('Hunters’ lodge') && r.lodge.includes('Buy Furs'), r.lodge); assert.equal(r.furs, 1); assert.equal(r.sold, 0); assert.equal(r.wrongGood, 0);
+  assert.ok(r.jewel.includes('Gems') && r.jewel.includes('Silver') && r.jewel.includes('Gold'), r.jewel);
+  assert.ok(r.mine.includes('Copper') && r.mine.includes('Iron') && r.mine.includes('Stone'), r.mine);
+  assert.ok(r.smithy.includes('Hunter’s spear') && r.smithy.includes('Moonsteel blade') && r.smithy.includes('Warden’s plate') && r.top === 4, r.smithy);
+  assert.deepEqual(r.weapon, ['Hunter’s spear', r.price]); assert.equal(r.noDowngrade, 'Hunter’s spear'); assert.equal(r.maxHp, 5 + 4);
+  assert.deepEqual(r.hp, [3, 1, 3]);        // +2 hearts; no second drink the same day; the next day it works again
+}));
+
+test('roads follow the world that is loaded, even when two saves have the same number of road tiles', () => game(async page => {
+  const r = await page.evaluate(() => {
+    state.roads = [100, 101, 102]; const first = isRoad(100 % WORLD_W, Math.floor(100 / WORLD_W)); const save = JSON.parse(JSON.stringify(buildSaveData()));
+    save.state.roads = [500, 501, 502]; hydrateWorld(save);
+    return { first, old: isRoad(100 % WORLD_W, Math.floor(100 / WORLD_W)), loaded: isRoad(500 % WORLD_W, Math.floor(500 / WORLD_W)) };
+  });
+  assert.deepEqual(r, { first: true, old: false, loaded: true });
 }));

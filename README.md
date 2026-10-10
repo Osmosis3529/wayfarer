@@ -24,11 +24,13 @@ Five **guardians** hold ancient relics: two in dungeons, two at the bottom of mi
 
 Stand on the home tile (⌂) and press **E** to walk into Brackenford, a detailed 60×40 map with roads, a plaza, fields, a lake and a plot for every building. Bump an empty plot to build there; bump a built door (or press E beside it) to go inside. Press M beside home for the explored-world chart.
 
-- **The hall** (longhouse → town hall → city hall as the settlement evolves) assigns citizens to jobs, sells building upgrades, and lets you rest for free. It also sets how many citizens can live in Brackenford (12, then 24, then 36).
-- **Population follows the pantry.** Newcomers arrive only once there is a hall, and the fuller the pantry is after the day's eating the faster they come: about 2 meals per citizen brings the odd traveler, 4 brings one a day, 8 brings two a day (up to the housing limit). The panel's Growth line says which it is today.
-- **Staffing.** Every working building needs its own citizen: you can only build one while there are more citizens than working buildings (the hall and the Beacon need nobody). Upgrades need more: at least 1 citizen per building in a Village, 2 per building in a Town and 3 in a City.
+- **The hall** (hall → town hall → city hall as the settlement evolves) runs the settlement: it assigns citizens to jobs, sells building upgrades, runs the war council and lets you rest for free.
+- **The longhouse** is housing and nothing else. With one, up to 12 citizens can live in Brackenford (24 as a Town, 36 as a City); without one only 2 can, and nobody new arrives.
+- **Population follows the pantry.** Newcomers arrive only once there is a longhouse, and the fuller the pantry is after the day's eating the faster they come: about 2 meals per citizen brings the odd traveler, 4 brings one a day, 8 brings two a day (up to the housing limit). The panel's Growth line says which it is today.
+- **Staffing.** Every working building needs its own citizen: you can only build one while there are more citizens than working buildings (the hall, the longhouse, the well and the Beacon need nobody). Upgrades need more: at least 1 citizen per building in a Village, 2 per building in a Town and 3 in a City.
 - **Jobs.** Citizens start out without work. Assign them from the hall: each building holds a limited number of workers, and its output is per worker (soldiers have no limit). A building with nobody working in it stays closed.
-- **Buildings you can enter**: the trading post, lumber mill, tannery and farm buy and sell goods (specialists pay more for their own). The mine deals in copper, iron and stone and has a shaft down into Brackenford Mine; the jeweler brings back and trades silver, gold and gems. The fishing hut sells meals for the pantry, and the hunters' lodge brings in meals and furs and sells both. The well needs no keeper and heals you once a day (upgrades heal more). The smithy crafts gear and the barracks shows your soldiers. Talk to any citizen by walking into them.
+- **Buildings you can enter**: the market, lumber mill and farm buy and sell goods (specialists pay more for their own). The mine deals in copper, iron and stone and has a shaft down into Brackenford Mine; the jeweler brings back and trades silver, gold and gems. The fishing hut sells meals for the pantry, and the hunters' lodge brings in meals and furs and sells both. The well needs no keeper and heals you once a day (upgrades heal more). The smithy crafts gear and the barracks shows your soldiers. Talk to any citizen by walking into them. The **caravan post** runs your trade deals (see below).
+- **From the overworld.** Brackenford's buildings stand around the home tile (⌂). Standing on the market, mine, jeweler, hunters' lodge, smithy, well or caravan post and pressing **E** opens it without walking in.
 - **Supplies have limits.** Each kind of goods (and the pantry) holds 50 to begin with. A **warehouse** with a citizen keeping it raises every limit by 100, and each warehouse upgrade by another 100. Gathering stops (without using up the patch) when a supply is full, purchases are refused, and your crews' production is wasted with a warning.
 - **Routes.** Gatherers walk between their building and their worksite (farm fields, forest, lake, hills); soldiers patrol the roads around the plaza.
 - **Upgrades and evolution.** Every building has one upgrade per tier (+50% output for its workers). Buy *all* of a tier's upgrades and Brackenford evolves to the next tier: the hall grows, buildings hold more workers, the upgrade list resets, and each upgrade now costs more (x1, x2, x3). The City tier is the last one; once every upgrade is bought there, the settlement is fully evolved.
@@ -36,21 +38,34 @@ Stand on the home tile (⌂) and press **E** to walk into Brackenford, a detaile
 
 ## Caves and dungeons
 
-Caves and dungeons are large winding mazes with loops, dead ends and chambers, and they are dark: you only see a circle of light around you (walls block it, so you see the wall but not what is behind it). Tiles you have lit stay faintly remembered. A **torch** burns for 120 steps and throws light twice as far: press **T** (or the torch button on a phone) to light one. The trading post and the lumber mill sell them (the mill is cheaper), caravans sell them, and caches in caves and dungeons sometimes hold some. The Delver's Lantern relic adds a little permanent light. Mines are not dark.
+Caves and dungeons are large winding mazes with loops, dead ends and chambers, and they are dark: you only see a circle of light around you (walls block it, so you see the wall but not what is behind it). Tiles you have lit stay faintly remembered. A **torch** burns for 120 steps and throws light twice as far: press **T** (or the torch button on a phone) to light one. The market and the lumber mill sell them (the mill is cheaper), caravans sell them, and caches in caves and dungeons sometimes hold some. The Delver's Lantern relic adds a little permanent light. Mines are not dark.
 
 ## Other settlements, the map and fast travel
 
-- **Walk into any settlement** you have found (stand on its tile and press E). Each one is a town map built from its size: more citizens mean a bigger map and more homes, and it changes as the population does. Every settlement has a market (regional prices), an inn (rest for coin), a caravan post (the world map), a hall (news, and where you can declare war) and homes. Their citizens walk the streets, and their workers wear that settlement's colour on the overworld and inside, so you can tell whose people you are looking at.
+- **Walk into any settlement** you have found (stand on its tile and press E). Each one is a town map built from its size: more citizens mean a bigger map and more homes, and it changes as the population does. Every settlement has a market (regional prices), an inn (rest for coin), a caravan post (the world map), a hall (jobs, news, and where you can declare war), a well (free healing once a day) and homes. Bigger ones also have a hunters' lodge, a smithy (it sells finished weapons and armor), and the biggest a jeweler and a mine. Their citizens walk the streets, and their workers wear that settlement's colour on the overworld and inside, so you can tell whose people you are looking at.
 - **The World map** button (or **M**) is always in the menu outside caves, dungeons and mines. It shows what you have explored and every settlement you have found.
 - **Fast travel**: from inside any settlement you can ride to any other settlement you have *visited* (walked into at least once) for coin. The farther the trip, the more it costs. You arrive at the destination's gate; a settlement you are at war with is closed to you.
 - **Roads**: every trip you ride marks a road between the two settlements on the overworld (and on the map). It changes nothing about how you move; it is just there to help you find your way.
+
+## Allies, quests and trade deals
+
+- **Rivals.** Most settlements cannot stand one of their neighbours (mutual, and the halls tell you who). Their hall also shows how they feel about you.
+- **Jobs.** Every hall keeps a board: bring them some goods they want, or defeat a few enemies (anywhere in the wilds, caves or dungeons, by you or your soldiers). You are paid in coin and they warm to you.
+- **Trade deals.** After two jobs a settlement will sign a trade deal with you, for a fee. You need a **caravan post** with a caravaner working it. A deal makes you **allies**.
+- **Caravans.** Each caravaner at your caravan post runs one deal. Every two days their caravan sells the goods you choose for the partner's prices, buys another kind of goods with your coin (always keeping a few coin and a few goods), and can fetch better weapons and armor from the partner's smith. Set it all from the caravan post. A deal with nobody free to run it waits.
+- **The price of friendship.** Allying with a settlement makes enemies of every settlement that cannot stand it (and drops any alliance with one of them). They declare war on Brackenford and stand down when the alliance ends. The hall tells you who you would be crossing before you sign.
+- **The journal** (**J**, or the Journal button) lists your jobs, allies, enemies, calls for help and every war.
 
 ## War, soldiers and rival settlements
 
 - **Marching soldiers.** In the barracks (or the war council) set how many soldiers follow you, from none up to everyone assigned to the barracks. They keep up with you across the overworld, attack enemies near them, and join your fights: after each of your actions they strike, and the foe may turn on one of them instead of you. A fallen soldier is replaced for 2 meals. Use "send them home" to stand the marchers down. (They wait outside caves, mines, dungeons and the settlement.)
 - **Everyone to the barracks.** The war council can call every citizen to arms in one click (production stops), and "stand down" puts everyone back in their old jobs.
-- **Wars of conquest.** Once you have a barracks, declare war on any settlement you have found, from the war council in the hall or barracks, or from inside the settlement itself. Its citizens come out as town guards (and a captain) and hold the ground around their town. Beat every defender, with your own hands or your soldiers', and the settlement is annexed: plunder, a few survivors join Brackenford, room for 4 more citizens at home, and a daily tribute of coin and goods. Merchants close their gates while you are at war; you can make peace for coin, but they will remember it.
-- **Aggression.** Every other settlement has a size and a randomized temper (peaceful, wary or hostile) that drifts over time. Hostile ones raid Brackenford: raiders appear far from home, warn you, and march on the settlement. Cut them down before they reach it or they ransack the pantry. Driving off a raid pays a reward and cools the raiders down. Settlements also attack each other (you hear about the ones you have found), and a weak one can be taken over by its neighbor.
+- **Declaring war is a siege.** Once you have a barracks, declare war on any settlement you have found (not an ally: end the alliance first). Its citizens take the field as guards and a captain, and the buildings around the town are fortified. You cannot enter until **every defender is beaten and every building torn down** (walk into a house to fight it; they do not move). Then walk in and the settlement is **annexed**: plunder, two survivors, and nothing built. Allies join a war you declare. You can make peace for coin while the siege is on, and merchants close their gates meanwhile.
+- **Annexed settlements are yours to run.** Walk into one and you have the same hall, longhouse, jobs, upgrades and shops as in Brackenford, with its own buildings, citizens and pantry, but your pack and coin are shared. Its crews work every day and fill your pack. Its growth and food are its own. (The Beacon, war council and marching orders stay in Brackenford.) Each settlement can be saved with you inside.
+- **Enemies assault Brackenford.** A settlement that is at war with you sends warbands. Every raider that gets through kills a citizen and sometimes burns a building, but they can never take the settlement. If every citizen dies, Brackenford starts again with two citizens and no buildings (your pack and coin are untouched). Your allies send soldiers against any raid, and driving a warband off pays you.
+- **Calls for help.** When one of your allies is attacked it asks for help. You have three days to send supplies (coin) or fight for them, or the alliance ends.
+- **Wars between settlements.** The world starts wars on its own, most often between rivals. In them citizens die and buildings are ruined (you can see it on their maps; they are rebuilt over days), but **nobody is annexed**. A war ends when one side has no citizens left: the winner takes the loser's stores, and the loser starts again with two citizens and no buildings. A war can also fizzle out after two weeks. **You can help defend or join the attack in any war** from the journal or the war council: warriors of the other side appear around the settlement under attack, and each one you beat is one citizen fewer for their side. Fight for the winner and you are paid and share the spoils.
+- **Aggression.** Every other settlement has a size and a randomized temper (peaceful, wary or hostile) that drifts over time. Hostile ones sometimes raid Brackenford for loot: raiders appear far from home, warn you, and march on the settlement. Cut them down before they reach it or they ransack the pantry. Driving off a raid pays a reward and cools the raiders down.
 
 ## Play it from the web (iPhone, iPad, Android, anywhere)
 
@@ -59,7 +74,7 @@ The game can also be hosted as a web app that installs to a phone's home screen,
 - **One-time setup:** in the repository's Settings → Pages, set *Build and deployment → Source* to **GitHub Actions** (not "Deploy from a branch": that publishes the README instead of the game). Then run the "Deploy web app" workflow from the Actions tab (or push to `main`). If you switched from the branch option, run the workflow once more afterwards, because the old branch publish can land after it and replace the game with the README. The address will be `https://<your-github-name>.github.io/<repository-name>/`.
 - **iPhone / iPad:** open the address in Safari, tap the Share button, then **Add to Home Screen**. **Android:** in Chrome, menu → *Install app*.
 - **Saves** are kept in the browser on that device. Installed apps are the safest place for them, but use **Export save** now and then: on a phone it opens the share sheet (Save to Files, AirDrop, ...), and **Load World from Save File** brings it back.
-- **Updates** download in the background after each deploy; the game says when a new version is ready and you reload to play it.
+- **Updates** download in the background after each deploy. In a browser tab the game says when a new version is ready and you reload to play it; an installed home-screen app or the Android app switches to it by itself the next time you come back to it, and keeps your place.
 - **Try it locally:** `npm run web:pwa` builds the hosted version into `site/`; serve that folder with any static web server (for example `python3 -m http.server -d site`) and open `http://localhost:8000`. Service workers only run on `localhost` or HTTPS.
 
 ## Troubleshooting
@@ -80,15 +95,37 @@ printf electron > node_modules/electron/path.txt
 
 ## Phone and tablet (Android)
 
-The game also runs on Android, in landscape, with an on-screen walking pad, an Interact (E) button, Eat, Pause and a menu button that slides out the log, pack and building panels. The touch controls switch on automatically on touch devices; add `?touch=1` to the page address to try them on a desktop browser.
+The game runs on Android in portrait or landscape (it follows the phone's auto-rotate setting). Held upright, the map shows a tall slice of the world with the walking pad, Interact (E), Eat, Pause and menu buttons underneath; sideways, the buttons float over a wider map. The menu button slides out the log, pack and building panels. The touch controls switch on automatically on touch devices; add `?touch=1` to the page address to try them on a desktop browser.
 
-The Android app is the same web game wrapped with [Capacitor](https://capacitorjs.com). To build an installable debug APK you need JDK 21 and the Android SDK (platform 36, build-tools 36):
+### How the app works
+
+The Android app is a thin shell ([Capacitor](https://capacitorjs.com)) that opens the hosted game at `https://osmosis3529.github.io/wayfarer/`, the same web app as above. That means **game updates reach phones without a new APK**: when a change is merged into `main`, the site redeploys, the app downloads the new version the next time it is open with a connection, and switches to it (keeping your place) the next time you come back to the app. After the first launch it also plays offline. Saves live inside the app on the phone, so use **Export save** now and then for a backup. The very first launch needs an internet connection; without one the app shows a "try again" page.
+
+A new APK is only needed when the shell itself changes (icon, permissions, the Android project, Capacitor). The "Android APK" workflow builds it.
+
+### Updating the Android app (signed releases)
+
+Android only installs an update over an existing app if both are signed with the same key and the new one has a higher version number. The workflow does both. One-time setup:
+
+1. Create a signing key (a file) and note its password. With JDK 21 installed:
+   `keytool -genkeypair -storetype PKCS12 -keystore wayfarer.keystore -alias wayfarer -keyalg RSA -keysize 2048 -validity 10000`
+   Use the **same password** when it asks for the key password too, and keep the alias `wayfarer`. **Back the file and password up somewhere safe and never commit them**: if they are lost, phones that already have the app must uninstall it before they can take an update.
+2. In the repository's Settings → Secrets and variables → Actions, add two repository secrets:
+   - `ANDROID_KEYSTORE_PASSWORD`: the password.
+   - `ANDROID_KEYSTORE_BASE64`: the key file as one line of text (`base64 -w0 wayfarer.keystore` on Linux, `base64 -i wayfarer.keystore` on a Mac).
+3. Run "Android APK" from the Actions tab (or merge a change to the Android project into `main`). On `main` it publishes the signed `wayfarer.apk` as a GitHub Release. On other branches it still builds the signed APK but only keeps it as a download on the run page. Each run's summary shows the key's fingerprint: it must be the same every time.
+
+To get updates on a phone without Google Play, install [Obtainium](https://github.com/ImranR98/Obtainium) (an open-source app that installs and updates apps straight from GitHub releases), choose *Add app*, and paste `https://github.com/Osmosis3529/wayfarer`. It checks for new releases and installs them (Android may ask you to confirm each install). Or download `wayfarer.apk` from the repository's Releases page and open it on the phone. The first signed APK cannot be installed over an older debug APK, because the key differs: export your save, uninstall the old app once, install the new one, and load your save.
+
+Without the secrets the workflow still builds a debug APK (signed with a throwaway key, so it cannot be installed over a release) as `wayfarer-debug-apk` on the run page, which is fine for quick tests of your own.
+
+### Building it yourself
+
+You need JDK 21 and the Android SDK (platform 36, build-tools 36):
 
 ```
 npm install
 npm run android:apk
 ```
 
-The APK appears at `android/app/build/outputs/apk/debug/app-debug.apk`. To install it, copy it to the phone, open it and allow installing from that source, or use `adb install`. A debug APK is fine for your own devices; Google Play would need a signed release build.
-
-You can also let GitHub build it: on the Actions tab, run "Android debug APK" and download the `wayfarer-debug-apk` artifact. The `android:sync` script (`npm run android:sync`) copies the latest game files into the Android project without building.
+The debug APK appears at `android/app/build/outputs/apk/debug/app-debug.apk`. To install it, copy it to the phone, open it and allow installing from that source, or use `adb install`. `npm run android:sync` copies the Android shell's files into the project without building. (To point the app at a different copy of the game, change `server.url` and `appStartPath` in `capacitor.config.json`.)

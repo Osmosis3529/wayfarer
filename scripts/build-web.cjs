@@ -10,7 +10,7 @@ const root = path.join(__dirname, '..');
 const arg = name => { const i = process.argv.indexOf(name); return i < 0 ? null : (process.argv[i + 1] || ''); };
 const pwa = process.argv.includes('--pwa');
 const out = path.resolve(root, arg('--out') || 'www');
-const SCRIPTS = ['gfx.js', 'settlement.js', 'war.js', 'dark.js', 'towns.js', 'touch.js'];
+const SCRIPTS = ['gfx.js', 'settlement.js', 'war.js', 'dark.js', 'towns.js', 'diplomacy.js', 'touch.js'];
 
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(path.join(out, 'assets', 'kenney'), { recursive: true });
@@ -44,6 +44,13 @@ if (pwa) {
   for (const f of ['manifest.webmanifest', 'pwa.js']) fs.copyFileSync(path.join(root, 'web', f), path.join(out, f));
 }
 fs.writeFileSync(path.join(out, 'index.html'), html);
+// The Android app loads the hosted game (see capacitor.config.json); if it cannot be reached it shows this page instead.
+if (!pwa) {
+  const server = JSON.parse(fs.readFileSync(path.join(root, 'capacitor.config.json'), 'utf8')).server || {};
+  if (!server.url) { console.error('capacitor.config.json has no server.url for the offline page to retry'); process.exit(1); }
+  const gameUrl = server.url + (server.appStartPath || '');
+  fs.writeFileSync(path.join(out, 'offline.html'), fs.readFileSync(path.join(root, 'web', 'offline.html'), 'utf8').replace('__GAME_URL__', gameUrl));
+}
 // The game used to live at wayfarer.html; keep old links and bookmarks working on the hosted site.
 if (pwa) fs.writeFileSync(path.join(out, 'wayfarer.html'), '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=./"><title>Wayfarer</title><script>location.replace("./" + location.search + location.hash)</script><p><a href="./">Play Wayfarer</a></p>\n');
 

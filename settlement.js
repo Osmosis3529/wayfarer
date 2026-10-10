@@ -7,6 +7,7 @@ const TOWN_W = 60, TOWN_H = 40;
 // Footprints, doors (always on the bottom row) and the road tile in front of each door.
 const TOWN_PLOTS = {
   hut:          { x0: 26, y0: 9,  x1: 33, y1: 13, door: [29, 13], front: [29, 14] },
+  longhouse:    { x0: 14, y0: 15, x1: 20, y1: 18, door: [17, 18], front: [17, 19] },
   market:       { x0: 37, y0: 10, x1: 42, y1: 13, door: [39, 13], front: [39, 14] },
   smithy:       { x0: 45, y0: 10, x1: 50, y1: 13, door: [47, 13], front: [47, 14] },
   mine:         { x0: 52, y0: 10, x1: 57, y1: 13, door: [54, 13], front: [54, 14] },
@@ -16,7 +17,7 @@ const TOWN_PLOTS = {
   jeweler:      { x0: 39, y0: 15, x1: 44, y1: 18, door: [41, 18], front: [41, 19] },
   barracks:     { x0: 46, y0: 15, x1: 52, y1: 18, door: [49, 18], front: [49, 19] },
   fishingHut:   { x0: 5,  y0: 22, x1: 10, y1: 25, door: [7, 25],  front: [7, 26] },
-  tannery:      { x0: 13, y0: 22, x1: 18, y1: 25, door: [15, 25], front: [15, 26] },
+  caravanPost:  { x0: 13, y0: 22, x1: 18, y1: 25, door: [15, 25], front: [15, 26] },
   lumberMill:   { x0: 37, y0: 22, x1: 42, y1: 25, door: [39, 25], front: [39, 26] },
   warehouse:  { x0: 45, y0: 22, x1: 50, y1: 25, door: [47, 25], front: [47, 26] },
   well:         { x0: 29, y0: 21, x1: 30, y1: 22, door: [29, 22], front: [29, 23] }
@@ -51,8 +52,8 @@ function buildTownMap() {
 let townMap = null;
 function brackenfordMap() { return townMap || (townMap = buildTownMap()); }
 // Brackenford's own map, or the interior of the settlement you are visiting (towns.js).
-function getTownMap() { return state.visiting ? npcMap().grid : brackenfordMap(); }
-function townPlots() { return state.visiting ? npcMap().plots : TOWN_PLOTS; }
+function getTownMap() { return npcVisit() ? npcMap().grid : brackenfordMap(); }
+function townPlots() { return npcVisit() ? npcMap().plots : TOWN_PLOTS; }
 function townW() { return getTownMap()[0].length; }
 function townH() { return getTownMap().length; }
 function townWalkable(g) { return g === '.' || g === '▒' || g === '▓' || g === '≡'; }
@@ -85,14 +86,14 @@ function townPath(from, to) {
 }
 
 // ---------------------------------------------------------------- economy: tiers, upgrades, jobs
-const HALL_NAMES = ['Longhouse', 'Town Hall', 'City Hall'];
+const HALL_NAMES = ['Hall', 'Town Hall', 'City Hall'];
 function hallName() { return HALL_NAMES[(state.town.tier || 1) - 1]; }
-const BUILDING_NAMES = { hut: 'Hall', market: 'Trading post', garden: 'Farm', well: 'Well', smithy: 'Smithy', huntersLodge: 'Hunters’ lodge', jeweler: 'Jeweler', lumberMill: 'Lumber mill', mine: 'Mine', tannery: 'Tannery', fishingHut: 'Fishing hut', warehouse: 'Warehouse', barracks: 'Barracks', beacon: 'Wayfarer’s Beacon' };
+const BUILDING_NAMES = { hut: 'Hall', longhouse: 'Longhouse', market: 'Market', garden: 'Farm', well: 'Well', smithy: 'Smithy', huntersLodge: 'Hunters’ lodge', jeweler: 'Jeweler', lumberMill: 'Lumber mill', mine: 'Mine', caravanPost: 'Caravan post', fishingHut: 'Fishing hut', warehouse: 'Warehouse', barracks: 'Barracks', beacon: 'Wayfarer’s Beacon' };
 function buildingName(key) { return key === 'hut' ? hallName() : BUILDING_NAMES[key]; }
-const UPGRADE_KEYS = ['hut', 'market', 'garden', 'well', 'smithy', 'huntersLodge', 'jeweler', 'lumberMill', 'mine', 'tannery', 'fishingHut', 'warehouse', 'barracks'];
+const UPGRADE_KEYS = ['hut', 'market', 'garden', 'well', 'smithy', 'huntersLodge', 'jeweler', 'lumberMill', 'mine', 'caravanPost', 'fishingHut', 'warehouse', 'barracks'];
 const JOB_KEYS = UPGRADE_KEYS.filter(k => k !== 'hut' && k !== 'well');   // the hall and the well need nobody
-const JOB_TITLES = { market: 'Trader', garden: 'Farmhand', smithy: 'Blacksmith', huntersLodge: 'Hunter', jeweler: 'Jeweler', lumberMill: 'Lumberjack', mine: 'Miner', tannery: 'Tanner', fishingHut: 'Fisher', warehouse: 'Warehouse keeper', barracks: 'Soldier', idle: 'Citizen' };
-const PRODUCERS = new Set(['lumberMill', 'mine', 'tannery', 'fishingHut', 'garden', 'huntersLodge', 'jeweler']);
+const JOB_TITLES = { market: 'Trader', garden: 'Farmhand', smithy: 'Blacksmith', huntersLodge: 'Hunter', jeweler: 'Jeweler', lumberMill: 'Lumberjack', mine: 'Miner', caravanPost: 'Caravaner', fishingHut: 'Fisher', warehouse: 'Warehouse keeper', barracks: 'Soldier', idle: 'Citizen' };
+const PRODUCERS = new Set(['lumberMill', 'mine', 'fishingHut', 'garden', 'huntersLodge', 'jeweler', 'caravanPost']);   // two workers per tier (a caravaner runs one trade deal)
 const TIER_NAMES = ['', 'Village', 'Town', 'City'];
 
 function ensureSettlementState() {
@@ -104,15 +105,17 @@ function ensureSettlementState() {
   for (const k of JOB_KEYS) if (state.built[k] && !state.assign[k] && unassigned() > 0) state.assign[k] = 1;
 }
 // Saves from before the warehouse and the jeweler: the hunting camp became the warehouse, the gem hall the jeweler, and the well lost its job.
-function migrateBuildings() {
+function migrateBuildings(savedBuilt) {
   const move = (obj, from, to) => { if (obj && from in obj) { if (!obj[to]) obj[to] = obj[from]; delete obj[from]; } };
-  for (const [from, to] of [['gemHall', 'jeweler'], ['huntingCamp', 'warehouse']]) for (const obj of [state.built, state.unlocked, state.assign, state.up]) move(obj, from, to);
+  for (const [from, to] of [['gemHall', 'jeweler'], ['huntingCamp', 'warehouse'], ['tannery', 'caravanPost']]) for (const obj of [state.built, state.unlocked, state.assign, state.up]) move(obj, from, to);
   if (state.assign) delete state.assign.well;
+  // Saves from before the longhouse was its own building: the old hall housed the citizens, so a built hall brings a longhouse with it.
+  if (savedBuilt && !('longhouse' in savedBuilt)) state.built.longhouse = !!savedBuilt.hut;
 }
-function housingCap() { return (state.built.hut ? [12, 24, 36][(state.town.tier || 1) - 1] : 2) + (typeof annexedCount === 'function' ? 4 * annexedCount() : 0); }
+function housingCap() { return state.built.longhouse ? [12, 24, 36][(state.town.tier || 1) - 1] : 2; }
 // Every working building needs its own citizen; upgrades need one more per building for each tier.
 function staffedBuildings() { return JOB_KEYS.filter(k => state.built[k]).length; }
-function canStaffNew(key) { return key === 'hut' || key === 'beacon' || key === 'well' || state.town.people > staffedBuildings(); }
+function canStaffNew(key) { return key === 'hut' || key === 'longhouse' || key === 'beacon' || key === 'well' || state.town.people > staffedBuildings(); }
 function staffNeeded(tier = state.town.tier || 1) { return tier * staffedBuildings(); }
 function canStaffUpgrade(tier = state.town.tier || 1) { return state.town.people >= staffNeeded(tier); }
 function staffNote(tier = state.town.tier || 1) { return tier + ' citizen' + (tier === 1 ? '' : 's') + ' per building × ' + staffedBuildings() + ' building' + (staffedBuildings() === 1 ? '' : 's') + ' = ' + staffNeeded(tier) + ' needed, ' + state.town.people + ' live here'; }
@@ -123,32 +126,34 @@ function growthPerDay() {
   return a >= 8 ? 2 : a >= 4 ? 1 : a >= 2 ? 0.4 : 0;
 }
 function growthLabel() {
-  if (!state.built.hut) return 'needs a ' + HALL_NAMES[0].toLowerCase();
+  if (!state.built.longhouse) return 'needs a longhouse';
   if (state.starving) return 'starving';
   if (state.town.people >= housingCap()) return 'housing full';
   const g = growthPerDay();
   return g >= 2 ? 'fast' : g >= 1 ? 'steady' : g > 0 ? 'slow' : 'none · pantry too thin';
 }
 function growPopulation() {
-  if (!state.built.hut || state.starving) return 0;
+  if (!state.built.longhouse || state.starving) return 0;
   const room = housingCap() - state.town.people, g = growthPerDay();
   const n = Math.min(room, g >= 1 ? g : (Math.random() < g ? 1 : 0));
   if (n <= 0) return 0;
   state.town.people += n;
-  say(n === 1 ? 'A traveler, drawn by the full pantry, settles in Brackenford. Give them a job at the ' + hallName().toLowerCase() + '.' : n + ' travelers, drawn by the full pantry, settle in Brackenford. Give them jobs at the ' + hallName().toLowerCase() + '.', 'gold');
+  say(n === 1 ? 'A traveler, drawn by the full pantry, settles in ' + settleName() + '. Give them a job at the ' + hallName().toLowerCase() + '.' : n + ' travelers, drawn by the full pantry, settle in ' + settleName() + '. Give them jobs at the ' + hallName().toLowerCase() + '.', 'gold');
   return n;
 }
 function capacity(key) {
   if (!state.built[key]) return 0;
   if (key === 'barracks') return Infinity;
-  if (key === 'hut' || key === 'beacon' || key === 'well') return 0;
+  if (key === 'hut' || key === 'longhouse' || key === 'beacon' || key === 'well') return 0;
   return (PRODUCERS.has(key) ? 2 : 1) * (state.town.tier || 1);
 }
 // ---------------------------------------------------------------- supplies: every kind of goods has a limit the warehouse raises
 const CAPPED = ['wood', 'stone', 'berries', 'copper', 'iron', 'silver', 'gold', 'furs', 'gems', 'torch'];
 const BASE_SUPPLY = 50, WAREHOUSE_SUPPLY = 100;
 // The limit for each kind of goods and for the pantry: 50, plus 100 while someone keeps the warehouse, plus 100 for each warehouse upgrade.
-function supplyCap() { return BASE_SUPPLY + (crew('warehouse') > 0 ? WAREHOUSE_SUPPLY * (1 + upgradesBought('warehouse')) : 0); }
+function warehouseBonus(r) { return r.built && r.built.warehouse && ((r.assign && r.assign.warehouse) || 0) > 0 ? WAREHOUSE_SUPPLY * (1 + ((r.up && r.up.warehouse) || []).filter(Boolean).length) : 0; }
+// Your pack is shared by every settlement you run, so its limit follows the best staffed warehouse among them.
+function supplyCap() { return BASE_SUPPLY + Math.max(0, ...allRecords().map(warehouseBonus)); }
 function roomFor(key) { return CAPPED.includes(key) ? Math.max(0, supplyCap() - state.inv[key]) : Infinity; }
 function roomForFood() { return Math.max(0, supplyCap() - state.town.food); }
 let overflow = {};
@@ -208,10 +213,10 @@ function checkEvolve() {
   if (tierProgress() < UPGRADE_KEYS.length) return;
   if (tier < 3) {
     state.town.tier = tier + 1;
-    say('Every upgrade is bought. Brackenford grows into a ' + TIER_NAMES[tier + 1] + '! The ' + HALL_NAMES[tier - 1] + ' becomes a ' + HALL_NAMES[tier] + ', buildings hold more workers, and a new round of costlier upgrades opens.', 'gold');
+    say('Every upgrade is bought. ' + settleName() + ' grows into a ' + TIER_NAMES[tier + 1] + '! The ' + HALL_NAMES[tier - 1] + ' becomes a ' + HALL_NAMES[tier] + ', buildings hold more workers, and a new round of costlier upgrades opens.', 'gold');
   } else if (!state.town.maxed) {
     state.town.maxed = true;
-    say('Every upgrade is bought. Brackenford is a fully evolved City.', 'gold');
+    say('Every upgrade is bought. ' + settleName() + ' is a fully evolved City.', 'gold');
   }
 }
 function buyUpgrade(key) {
@@ -256,7 +261,7 @@ function retarget(p, job) { p.job = job; p.targets = targetsFor(job, p.idx); p.t
 // Keeps every citizen where they are; only people whose job changed get new routes.
 function syncTownPeople() {
   ensureSettlementState();
-  if (state.visiting) return syncNpcPeople();
+  if (npcVisit()) return syncNpcPeople();
   const total = Math.max(0, state.town.people), taken = new Set([state.x + ',' + state.y]);
   townPeople = townPeople.slice(0, total);
   for (const p of townPeople) taken.add(p.x + ',' + p.y);
@@ -301,6 +306,7 @@ function moveTownPeople() {
 
 // ---------------------------------------------------------------- entering and leaving
 function enterTown(quiet) {
+  if (state.cur) ctxOut();
   ensureSettlementState();
   state.visiting = null; townPeople = []; townPathCache.clear();
   state.zone = 'town'; state.site = null; state.returnPoint = null; state.view = 'explore';
@@ -313,6 +319,7 @@ function exitTown() {
   if (state.zone !== 'town') return;
   closeDialog();
   const from = state.visiting ? townById(state.visiting) : null;
+  if (state.cur) ctxOut();
   map = overworld; state.zone = 'overworld'; state.visiting = null; state.x = from ? from.x : HOME.x; state.y = from ? from.y : HOME.y; state.view = 'explore'; townPeople = [];
   say(from ? 'You leave ' + from.name + ' for the wilds.' : 'You leave Brackenford for the wilds.');
   render();
@@ -340,7 +347,7 @@ function townInteract() {
 // ---------------------------------------------------------------- dialogs
 function bld(key) { return buildingName(key); }
 const TALK = {
-  hut: ['The hall hums with business. Every upgrade we buy makes Brackenford stronger.', 'Keep the pantry full and the newcomers keep coming.'],
+  hut: ['The hall hums with business. Every upgrade we buy makes the settlement stronger.', 'Keep the pantry full and the newcomers keep coming.'],
   market: ['Best prices in the Briarwood, friend. Mostly.', 'I buy anything that isn’t nailed down, and some things that are.'],
   garden: ['The soil here is kind. Bring me a hand to help and the fields will do the rest.', 'Berries sweeten up the pantry better than anything.'],
   well: ['Cold water, free for anyone who needs it.', 'A well is the heart of a town. Mind the bucket.'],
@@ -349,7 +356,8 @@ const TALK = {
   jeweler: ['Gems, silver, gold: everything has a price here.', 'Bring me something that sparkles.'],
   lumberMill: ['The groves keep growing back if you treat them kindly.', 'Timber’s the backbone of any town.'],
   mine: ['Deep down, the seams run richer. Mind the dark.', 'Stone and iron, day in and day out.'],
-  tannery: ['Good leather takes time. Bring furs and I’ll buy them fairly.', 'A fox’s molt is worth more than you’d think.'],
+  caravanPost: ['The wagons are loaded and the roads are open. Strike a deal with a friendly settlement and they roll on their own.', 'Every caravaner runs one trade deal. Hire more to keep more deals going.'],
+  longhouse: ['It’s crowded, but it’s warm. Everyone has a bed here.', 'The longhouse keeps everyone sheltered. Build more room by growing the settlement.'],
   fishingHut: ['The lake is generous this season.', 'A day on the water feeds half the town.'],
   warehouse: ['Everything has its place on these shelves.', 'Staff the warehouse and the whole settlement can store more.'],
   barracks: ['The soldiers keep the road safe. Pay them in good gear.', 'Assign more citizens and the patrol grows.'],
@@ -357,7 +365,7 @@ const TALK = {
 };
 function talkLine(p) {
   const lines = TALK[p.job] || TALK.idle, pick = lines[(townHash(p.idx + state.day, p.id.length) % lines.length)];
-  if (state.visiting) return pick + ' ' + visitorGossip(p);
+  if (npcVisit()) return pick + ' ' + visitorGossip(p);
   const extra = [];
   if (state.starving) extra.push('We’re going hungry. Please, bring food.');
   else if (state.town.food < state.town.people * 2) extra.push('The pantry is running low.');
@@ -379,13 +387,13 @@ function buildPrompt(key) {
   const gated = { smithy: !state.unlocked.smithy, huntersLodge: !state.unlocked.huntersLodge, jeweler: !state.unlocked.jeweler }[key];
   let tail;
   if (gated) tail = '<p>You need the right materials first: ' + ({ smithy: 'copper or iron', huntersLodge: 'furs', jeweler: 'gems' }[key]) + '.</p>';
-  else if (!canStaffNew(key)) tail = '<p>Nobody is free to staff it: ' + state.town.people + ' citizens already work in ' + staffedBuildings() + ' buildings. Every working building needs its own citizen, so Brackenford must grow first. A full pantry attracts newcomers.</p>';
+  else if (!canStaffNew(key)) tail = '<p>Nobody is free to staff it: ' + state.town.people + ' citizens already work in ' + staffedBuildings() + ' buildings. Every working building needs its own citizen, so the settlement must grow first. A full pantry attracts newcomers.</p>';
   else if (key === 'beacon' && ((state.town.tier || 1) < 3 || !state.inv.sunstone)) tail = '<p>The Beacon needs a City and a Sunstone from the Hollow King. Cost: ' + costLabel(key) + '.</p>';
   else tail = '<button ' + (canAfford(cost) ? '' : 'disabled') + ' onclick="closeDialog();build(\'' + key + '\');if(state.built[\'' + key + '\'])openBuilding(\'' + key + '\')">Build · ' + costLabel(key) + '</button>';
   showDialog('<h2>Empty plot</h2><p>A fenced lot waits for a ' + bld(key).toLowerCase() + '.</p>' + tail + '<button onclick="closeDialog()">Leave</button>');
 }
 function openBuilding(key) {
-  if (state.visiting) { npcBuilding(key); return; }
+  if (npcVisit()) { npcBuilding(key); return; }
   if (!state.built[key]) { buildPrompt(key); return; }
   syncTownPeople();
   const svc = SERVICES[key];
@@ -397,12 +405,11 @@ function shopPrice(key, item, side) {
   if (spec.includes(item)) p = side === 'buy' ? Math.max(1, Math.round(base * .85)) : Math.round(base * 1.2);
   return Math.max(1, p);
 }
-const SHOP_SPECIALTY = { lumberMill: ['wood', 'torch'], mine: ['stone', 'copper', 'iron'], tannery: ['furs'], garden: ['berries'], huntersLodge: ['furs'], jeweler: ['gems', 'silver', 'gold'] };
+const SHOP_SPECIALTY = { lumberMill: ['wood', 'torch'], mine: ['stone', 'copper', 'iron'], garden: ['berries'], huntersLodge: ['furs'], jeweler: ['gems', 'silver', 'gold'] };
 const SHOP_GOODS = {
   market: { buy: ['berries', 'wood', 'stone', 'copper', 'iron', 'silver', 'gold', 'furs', 'gems', 'torch'], sell: ['berries', 'wood', 'stone', 'copper', 'iron', 'silver', 'gold', 'furs', 'gems', 'torch', 'relic'] },
   lumberMill: { buy: ['wood', 'torch'], sell: ['wood', 'torch'] },
   mine: { buy: ['stone', 'copper', 'iron'], sell: ['stone', 'copper', 'iron'] },
-  tannery: { buy: ['furs'], sell: ['furs'] },
   garden: { buy: ['berries'], sell: ['berries'] },
   huntersLodge: { buy: ['furs'], sell: ['furs'] },
   jeweler: { buy: ['gems', 'silver', 'gold'], sell: ['gems', 'silver', 'gold', 'relic'] }
@@ -460,19 +467,23 @@ function smithyDialog(key) {
   if (!open) { showDialog('<h2>' + esc(bld(key)) + '</h2>' + staffBlock(key) + '<button onclick="closeDialog()">Leave</button>'); return; }
   openSmithy();
 }
-function mineDialog(key) { shopDialog(key, '<h3>The shaft</h3><button onclick="closeDialog();exitToMine()">Descend into Brackenford Mine · ' + homeMine.maxDepth + ' levels</button>'); }
+function mineDialog(key) { shopDialog(key, state.cur ? '' : '<h3>The shaft</h3><button onclick="closeDialog();exitToMine()">Descend into Brackenford Mine · ' + homeMine.maxDepth + ' levels</button>'); }
 function exitToMine() { map = overworld; state.zone = 'overworld'; state.x = HOME.x; state.y = HOME.y; enterInstance(homeMine, 'mine'); }
 function barracksDialog(key) {
   const soldiers = crew('barracks');
-  showDialog('<h2>' + esc(bld(key)) + '</h2>' + staffBlock(key) + '<p>' + soldiers + ' of ' + state.town.people + ' citizens serve as soldiers. Assign more from the ' + esc(hallName().toLowerCase()) + '.</p>' + (soldiers ? escortControls('barracks') : '') +
-    '<button onclick="warCouncil()">War council</button><button onclick="closeDialog()">Leave</button>');
+  showDialog('<h2>' + esc(bld(key)) + '</h2>' + staffBlock(key) + '<p>' + soldiers + ' of ' + state.town.people + ' citizens serve as soldiers. Assign more from the ' + esc(hallName().toLowerCase()) + '.' + (state.cur ? ' Here they only guard the streets: marching orders and the war council belong to Brackenford.' : '') + '</p>' + (soldiers && !state.cur ? escortControls('barracks') : '') +
+    (state.cur ? '' : '<button onclick="warCouncil()">War council</button>') + '<button onclick="closeDialog()">Leave</button>');
 }
 function beaconDialog() { showDialog('<h2>' + esc(bld('beacon')) + '</h2><p>The Beacon stands lit over Brackenford.</p><button onclick="closeDialog()">Leave</button>'); }
 function hallDialog() {
   const tier = state.town.tier || 1, prog = tierProgress(), goal = UPGRADE_KEYS.length;
   showDialog('<h2>' + esc(hallName()) + '</h2><p><strong>' + TIER_NAMES[tier] + '</strong> · ' + state.town.people + ' / ' + housingCap() + ' citizens · ' + unassigned() + ' without work · pantry ' + state.town.food + ' meals' + (state.starving ? ' (starving!)' : '') + '</p><p>Growth: <strong>' + esc(growthLabel()) + '</strong>. Newcomers arrive when the pantry holds plenty of meals per citizen: about 2 per citizen for the odd traveler, 4 for one a day, 8 for two a day.</p>' +
-    '<p>Upgrades this tier: ' + prog + ' / ' + goal + (tier < 3 ? '. Buy them all and Brackenford evolves.' : (state.town.maxed ? '. Fully evolved.' : '. Buy them all to complete the City.')) + '</p>' +
-    '<button onclick="upgradesDialog()">Settlement upgrades</button><button onclick="citizensDialog()">Citizens and jobs</button>' + (state.built.barracks ? '<button onclick="warCouncil()">War council</button>' : '') + '<button onclick="hallRest()">Rest here · free</button><button onclick="closeDialog()">Leave</button>');
+    '<p>Upgrades this tier: ' + prog + ' / ' + goal + (tier < 3 ? '. Buy them all and ' + settleName() + ' evolves.' : (state.town.maxed ? '. Fully evolved.' : '. Buy them all to complete the City.')) + '</p>' +
+    '<button onclick="upgradesDialog()">Settlement upgrades</button><button onclick="citizensDialog()">Citizens and jobs</button>' + (state.built.barracks && !state.cur ? '<button onclick="warCouncil()">War council</button>' : '') + '<button onclick="hallRest()">Rest here · free</button><button onclick="closeDialog()">Leave</button>');
+}
+function longhouseDialog() {
+  const tier = state.town.tier || 1;
+  showDialog('<h2>' + esc(bld('longhouse')) + '</h2><p>The longhouse is where the settlement sleeps. It houses up to <strong>' + [12, 24, 36][tier - 1] + '</strong> citizens as a ' + TIER_NAMES[tier] + ' (24 as a Town, 36 as a City) and does nothing else: jobs and upgrades are run from the ' + esc(hallName().toLowerCase()) + '.</p><p>' + state.town.people + ' / ' + housingCap() + ' citizens live here · growth: <strong>' + esc(growthLabel()) + '</strong>.</p><button onclick="closeDialog()">Leave</button>');
 }
 function hallRest() { state.hp = state.maxHp; say('You rest in the ' + hallName().toLowerCase() + ' and recover all hearts.', 'gold'); render(); closeDialog(); }
 function upgradesDialog() {
@@ -485,7 +496,7 @@ function upgradesDialog() {
     return '<div class="up-row"><span>' + esc(bld(k)) + '</span><button ' + (canAfford(cost) && canStaffUpgrade(tier) ? '' : 'disabled') + ' onclick="buyUpgrade(\'' + k + '\')">Upgrade · ' + costText(cost) + '</button></div>';
   }).join('');
   const total = JOB_KEYS.reduce((n, k) => n + upgradesBought(k), 0) + upgradesBought('hut');
-  showDialog('<h2>Settlement upgrades</h2><p>Tier ' + tier + ' (' + TIER_NAMES[tier] + '): ' + tierProgress() + ' / ' + UPGRADE_KEYS.length + ' bought. ' + (tier < 3 ? 'Every one of them evolves Brackenford to a ' + TIER_NAMES[tier + 1] + ', then a costlier set opens.' : 'This is the last tier.') + '</p><p>Each upgrade makes that building’s workers produce 50% more, permanently (' + total + ' bought so far). Warehouse upgrades instead raise every supply limit by 100, and well upgrades heal one more heart per drink.</p><p>' + (canStaffUpgrade(tier) ? 'Staffing: ' : '<strong>Not enough citizens to upgrade.</strong> ') + esc(staffNote(tier)) + '.</p>' + rows + '<button onclick="hallDialog()">Back</button><button onclick="closeDialog()">Leave</button>');
+  showDialog('<h2>Settlement upgrades</h2><p>Tier ' + tier + ' (' + TIER_NAMES[tier] + '): ' + tierProgress() + ' / ' + UPGRADE_KEYS.length + ' bought. ' + (tier < 3 ? 'Every one of them evolves ' + settleName() + ' to a ' + TIER_NAMES[tier + 1] + ', then a costlier set opens.' : 'This is the last tier.') + '</p><p>Each upgrade makes that building’s workers produce 50% more, permanently (' + total + ' bought so far). Warehouse upgrades instead raise every supply limit by 100, and well upgrades heal one more heart per drink.</p><p>' + (canStaffUpgrade(tier) ? 'Staffing: ' : '<strong>Not enough citizens to upgrade.</strong> ') + esc(staffNote(tier)) + '.</p>' + rows + '<button onclick="hallDialog()">Back</button><button onclick="closeDialog()">Leave</button>');
 }
 function citizensDialog() {
   ensureSettlementState();
@@ -499,7 +510,8 @@ const SERVICES = {
   hut: () => hallDialog(),
   market: k => shopDialog(k),
   lumberMill: k => shopDialog(k),
-  tannery: k => shopDialog(k),
+  caravanPost: k => caravanDialog(k),
+  longhouse: () => longhouseDialog(),
   garden: k => shopDialog(k),
   huntersLodge: k => lodgeDialog(k),
   jeweler: k => shopDialog(k),
@@ -517,7 +529,7 @@ function drawTownCell(ctx, c, x, y, px, py, frame) {
   const T = GFX.T;
   if (c === '▣' || c === '▤') {
     const key = plotContaining(x, y), p = townPlots()[key];
-    if (state.visiting) { const a = npcPlotArt(key); GFX.townPlot(ctx, a.art, true, x - p.x0, y - p.y0, p.x1 - p.x0 + 1, p.y1 - p.y0 + 1, c === '▤', px, py, a.tier, p.door[0] - p.x0); return; }
+    if (npcVisit()) { const a = npcPlotArt(key); GFX.townPlot(ctx, a.art, true, x - p.x0, y - p.y0, p.x1 - p.x0 + 1, p.y1 - p.y0 + 1, c === '▤', px, py, a.tier, p.door[0] - p.x0); return; }
     GFX.townPlot(ctx, key, !!state.built[key], x - p.x0, y - p.y0, p.x1 - p.x0 + 1, p.y1 - p.y0 + 1, c === '▤', px, py, state.town.tier || 1, p.door[0] - p.x0);
     return;
   }
@@ -544,7 +556,7 @@ function dailyOutput(key, perWorker) {
 }
 
 function renderTown() {
-  if (state.visiting) { renderVisitPanel(); return; }
+  if (npcVisit()) { renderVisitPanel(); return; }
   ensureSettlementState();
   const tier = state.town.tier || 1, built = Object.values(state.built).filter(Boolean).length, goal = UPGRADE_KEYS.length;
   const evo = tier < 3 || !state.town.maxed ? tierProgress() + ' / ' + goal + ' upgrades' : 'Fully evolved';
@@ -557,27 +569,28 @@ function renderTown() {
     '<div class="town-metric">Storage<b>' + supplyCap() + ' per supply' + (crew('warehouse') ? '' : ' · no warehouse keeper') + '</b></div>' +
     '<div class="town-metric">Growth<b>' + esc(growthLabel()) + '</b></div>' +
     '<div class="town-metric">Projects<b>' + built + ' / ' + Object.keys(state.built).length + ' built</b></div>' +
-    (annexedCount() ? '<div class="town-metric">Annexed<b>' + annexedCount() + ' settlement' + (annexedCount() === 1 ? '' : 's') + '</b></div>' : '') +
+    (annexedCount() && !state.cur ? '<div class="town-metric">Annexed<b>' + annexedCount() + ' settlement' + (annexedCount() === 1 ? '' : 's') + '</b></div>' : '') +
     (state.raid ? '<div class="town-metric">Raid<b>' + state.raid.left + ' raiders from ' + esc(state.raid.name) + '</b></div>' : '');
   const rows = JOB_KEYS.filter(k => crew(k) > 0).map(k => '<div class="town-person"><b>' + esc(JOB_TITLES[k]) + (crew(k) > 1 ? ' ×' + crew(k) : '') + '</b><span>' + esc(buildingName(k)) + '</span></div>');
   if (unassigned() > 0) rows.push('<div class="town-person"><b>Citizen ×' + unassigned() + '</b><span>Waiting for work · assign at the ' + esc(hallName().toLowerCase()) + '</span></div>');
   document.getElementById('townfolk').innerHTML = rows.join('');
   const hints = [goalHint()];
-  hints.push(state.built.hut ? 'Walk into a building to go inside, talk to its workers and use its services. The ' + hallName().toLowerCase() + ' assigns jobs and sells upgrades.' : 'Build the longhouse first: it raises the citizen limit and lets you assign jobs and buy upgrades.');
+  if (!state.built.longhouse) hints.push('Build a longhouse: it houses up to 12 citizens (24 in a Town, 36 in a City). Without one only 2 can live here and nobody new arrives.');
+  hints.push(state.built.hut ? 'Walk into a building to go inside, talk to its workers and use its services. The ' + hallName().toLowerCase() + ' assigns jobs and sells upgrades.' : 'Build the hall: it assigns jobs, sells upgrades and runs the war council.');
   if (!state.unlocked.smithy) hints.push('Find or buy copper or iron to unlock the blacksmith.');
   if (!state.unlocked.huntersLodge) hints.push('Find or buy furs to unlock the hunters’ lodge.');
   if (!state.unlocked.jeweler) hints.push('Find or buy gems to unlock the jeweler.');
   hints.push('Every working building needs its own citizen: you can only build one while there are more citizens than working buildings. Upgrades need more: 1 citizen per building in a Village, 2 in a Town, 3 in a City. Residents eat 1 meal a day, and newcomers arrive faster the fuller the pantry is.');
-  hints.push('Buy every building upgrade of a tier and Brackenford evolves: the hall grows, buildings hold more workers, and a costlier round of upgrades opens. Each upgrade makes that building’s workers produce 50% more.');
+  hints.push('Buy every building upgrade of a tier and the settlement evolves: the hall grows, buildings hold more workers, and a costlier round of upgrades opens. Each upgrade makes that building’s workers produce 50% more.');
   if (state.built.barracks) hints.push('Soldiers are citizens assigned to the barracks. They patrol the roads and the wilds near home, or march with you if you set a marching order; a fallen soldier is replaced for 2 meals. The war council (in the hall or barracks) declares wars: beat every defender of a settlement to annex it.');
   document.getElementById('town-hint').textContent = hints.join(' ');
 }
 
 // ---------------------------------------------------------------- drawing the settlement
-function townView() { return [Math.max(0, Math.min(townW() - 25, state.x - 12)), Math.max(0, Math.min(townH() - 15, state.y - 7))]; }
+function townView() { const [cols, rows] = viewSize(); return [Math.max(0, Math.min(townW() - cols, state.x - (cols >> 1))), Math.max(0, Math.min(townH() - rows, state.y - (rows >> 1)))]; }
 function renderTownGfx(ctx, W, H, frame, now) {
-  const T = GFX.T, [left, top] = townView(), folks = townPeopleMap();
-  for (let j = 0; j < 15; j++) for (let i = 0; i < 25; i++) {
+  const T = GFX.T, [left, top] = townView(), [cols, rows] = viewSize(), folks = townPeopleMap();
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
     const x = left + i, y = top + j, c = map[y] && map[y][x], px = i * T, py = j * T;
     if (c === undefined) { ctx.fillStyle = '#0b100d'; ctx.fillRect(px, py, T, T); continue; }
     drawTownCell(ctx, c, x, y, px, py, frame);
@@ -589,7 +602,7 @@ function renderTownGfx(ctx, W, H, frame, now) {
   for (const [key, p] of Object.entries(townPlots())) {
     const cx = ((p.x0 + p.x1 + 1) / 2 - left) * T, cy = (p.y0 - top + (key === 'well' ? -0.2 : 1.1)) * T;
     if (cx < -40 || cx > W + 40 || cy < 0 || cy > H) continue;
-    const label = state.visiting ? npcLabel(key) : state.built[key] ? buildingName(key) : 'Empty plot · ' + buildingName(key);
+    const label = npcVisit() ? npcLabel(key) : state.built[key] ? buildingName(key) : 'Empty plot · ' + buildingName(key);
     ctx.strokeText(label, cx, cy); ctx.fillText(label, cx, cy);
   }
   ctx.fillStyle = '#ffffff';
@@ -606,7 +619,7 @@ function townTextCell(x, y, c, folks) {
   if (x === state.x && y === state.y) return ['@', 'player'];
   const p = folks.get(x + ',' + y);
   if (p) return p.job === 'barracks' || p.job === 'guard' ? ['s', 'soldier', currentColor()] : ['w', 'worker', currentColor()];
-  if (c === '▣') return state.visiting || state.built[plotContaining(x, y)] ? ['▣', 'town'] : ['░', 'fog'];
+  if (c === '▣') return npcVisit() || state.built[plotContaining(x, y)] ? ['▣', 'town'] : ['░', 'fog'];
   if (c === '▤' || c === '▼') return [c, 'town'];
   return [c, c === '♣' ? 'tree' : c === '≈' ? 'water' : c === '▲' ? 'stone' : c === '≡' ? 'berry' : 'path'];
 }

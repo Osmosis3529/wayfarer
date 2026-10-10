@@ -167,7 +167,9 @@ test('building buttons show the real costs and building deducts them', () => gam
 
 test('every town and site can be reached from home', () => game(async page => {
   const r = await page.evaluate(() => {
-    const k = mines[0];
+    // a mine whose ring of tiles holds no other site, so the water ring really is closed
+    const clearRing = m => { for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === 2 && 'SCDKM⌂'.includes(overworld[m.y + dy][m.x + dx])) return false; return true; };
+    const k = mines.find(clearRing) || mines[0];
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === 2 && !'SCDKM⌂'.includes(overworld[k.y + dy][k.x + dx])) overworld[k.y + dy][k.x + dx] = '≈';
     const walledOff = !reachableFromHome()[k.y][k.x];
     ensureReachable();
@@ -274,7 +276,7 @@ test('towns have regional goods and trading requires being in town', () => game(
     const prices = { cheapBuy: regionPrice({ ...t, bias: 0 }, cheap, 'buy') - buyPrices[cheap], dearSell: regionPrice({ ...t, bias: 0 }, dear, 'sell') - sellPrices[dear] };
     state.x = HOME.x; state.y = HOME.y; closeDialog(); trade(t.id); const farAway = document.getElementById('overlay').style.display;
     state.x = t.x; state.y = t.y; trade(t.id); const inTown = document.getElementById('overlay').style.display;
-    closeDialog(); openMap(); const rideButtons = [...document.querySelectorAll('#dialog button')].filter(b => b.textContent.startsWith('Ride') && !b.disabled).length;
+    closeDialog(); state.coin = 0; openMap(); const rideButtons = [...document.querySelectorAll('#dialog button')].filter(b => b.textContent.startsWith('Ride') && !b.disabled).length;
     return { prices, farAway, inTown, listHasButton: rideButtons > 0, distinct: settlements.every(s => s.surplus.length === 2 && s.scarce.length === 2 && !s.surplus.some(k => s.scarce.includes(k))) };
   });
   assert.ok(r.prices.cheapBuy < 0); assert.ok(r.prices.dearSell > 0);
@@ -408,9 +410,9 @@ test('phone layout fits a landscape screen with no scrolling', () => phone(async
   const r = await page.evaluate(() => {
     const cv = document.getElementById('view').getBoundingClientRect(), dp = document.getElementById('dpad').getBoundingClientRect();
     return { touch: document.body.classList.contains('touch'), sx: document.documentElement.scrollWidth - innerWidth, sy: document.documentElement.scrollHeight - innerHeight,
-      canvasBottom: Math.round(cv.bottom), canvasW: Math.round(cv.width), dpadVisible: dp.width > 0, rotate: getComputedStyle(document.getElementById('rotate-hint')).display, h: innerHeight };
+      canvasBottom: Math.round(cv.bottom), canvasW: Math.round(cv.width), dpadVisible: dp.width > 0, cols: cv.width / 16, h: innerHeight };
   });
-  assert.equal(r.touch, true); assert.ok(r.sx <= 0 && r.sy <= 0, JSON.stringify(r)); assert.ok(r.canvasBottom <= r.h); assert.ok(r.dpadVisible); assert.equal(r.rotate, 'none');
+  assert.equal(r.touch, true); assert.ok(r.sx <= 0 && r.sy <= 0, JSON.stringify(r)); assert.ok(r.canvasBottom <= r.h); assert.ok(r.dpadVisible); assert.equal(await page.evaluate(() => document.getElementById('view').width / 16), 25);
 }));
 
 test('holding the on-screen pad walks, and the buttons act', () => phone(async page => {
@@ -443,10 +445,31 @@ test('the menu drawer opens, pauses the world, and holds the side panels', () =>
   assert.deepEqual(r, { closed: true, open: true, frozen: true, tools: r.tools, resumed: true }); assert.ok(r.tools >= 4);
 }));
 
-test('portrait shows a rotate hint, and battle dialogs fit a short screen', async () => {
+test('held upright the map shows a tall slice, the pad sits below it, and turning the phone switches views', () => phone(async page => {
+  const look = () => page.evaluate(() => {
+    const cv = document.getElementById('view'), r = cv.getBoundingClientRect(), pad = document.getElementById('dpad').getBoundingClientRect(), act = document.getElementById('touch-actions').getBoundingClientRect();
+    return { cols: cv.width / 16, rows: cv.height / 16, left: Math.round(r.left), right: Math.round(r.right), bottom: Math.round(r.bottom), padTop: Math.round(pad.top), actTop: Math.round(act.top), w: innerWidth, h: innerHeight,
+      sx: document.documentElement.scrollWidth - innerWidth, sy: document.documentElement.scrollHeight - innerHeight, rotateHint: !!document.getElementById('rotate-hint') };
+  });
+  const up = await look();
+  assert.equal(up.cols, 15); assert.ok(up.rows >= 21 && up.rows <= 27 && up.rows % 2 === 1, 'rows ' + up.rows);
+  assert.ok(up.left <= 1 && up.right >= up.w - 1, 'the map should span the width ' + JSON.stringify(up));
+  assert.ok(up.bottom <= up.padTop && up.bottom <= up.actTop, 'the buttons must not cover the map ' + JSON.stringify(up));
+  assert.ok(up.sx <= 0 && up.sy <= 0 && !up.rotateHint, JSON.stringify(up));
+  // the player stays in the middle row and column of the slice, in the open and inside a settlement
+  const centre = await page.evaluate(() => { enterTown(); renderMap(); const [l, t] = townView(), [c, r] = viewSize(); return { cols: document.getElementById('view').width / 16, inside: state.x - l >= 0 && state.x - l < c && state.y - t >= 0 && state.y - t < r }; });
+  assert.deepEqual(centre, { cols: 15, inside: true });
+  await page.setViewportSize({ width: 915, height: 412 }); await page.waitForFunction(() => document.getElementById('view').width / 16 === 25);
+  assert.equal((await look()).rows, 15);
+  await page.setViewportSize({ width: 412, height: 915 }); await page.waitForFunction(() => document.getElementById('view').width / 16 === 15);
+  assert.ok((await look()).rows >= 21);
+}, { width: 390, height: 844 }));
+
+test('a dialog fits a portrait phone, and battle dialogs fit a short landscape screen', async () => {
   await phone(async page => {
-    assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('rotate-hint')).display), 'grid');
-  }, { width: 412, height: 915 });
+    const r = await page.evaluate(() => { openMap(); const d = document.getElementById('dialog').getBoundingClientRect(); return { top: d.top, bottom: d.bottom, left: d.left, right: d.right, h: innerHeight, w: innerWidth }; });
+    assert.ok(r.top >= 0 && r.bottom <= r.h && r.left >= 0 && r.right <= r.w, JSON.stringify(r));
+  }, { width: 390, height: 844 });
   await phone(async page => {
     const r = await page.evaluate(() => {
       manualPause = true; state.x = HOME.x + 12; state.y = HOME.y; const x = state.x + 1, y = state.y;
@@ -541,3 +564,24 @@ test('relics and the reveal survive saving, and old saves keep the old goal', ()
   });
   assert.deepEqual(r, { kept: true, legacyRevealed: true, legacyGlyph: 'K', guardians: 5 });
 }));
+
+test('the journal, a hall board and the caravan post fit a phone screen upright and sideways', async () => {
+  for (const viewport of [{ width: 390, height: 844 }, { width: 740, height: 360 }]) {
+    await phone(async page => {
+      const r = await page.evaluate(() => {
+        manualPause = true; const fit = () => { const d = document.getElementById('dialog').getBoundingClientRect(); return d.top >= 0 && d.bottom <= innerHeight && d.left >= 0 && d.right <= innerWidth; };
+        Object.assign(state.inv, { wood: 99, stone: 99 }); state.coin = 300; state.town.people = 12; build('hut'); build('longhouse'); build('caravanPost');
+        for (const s of settlements) { s.dislikes = []; s.discovered = true; }
+        const a = settlements[0]; a.people = 9; state.x = a.x; state.y = a.y; enterSettlement(a.id); closeDialog();
+        const hall = Object.entries(npcMap().plots).find(([, p]) => p.kind === 'hall')[0];
+        const out = {}; npcBuilding(hall); out.hall = fit(); closeDialog();
+        relOf(a.id).favor = 2; state.deals[a.id] = { sell: 'wood', buy: 'iron', gear: true, last: state.day, since: state.day, trips: 3, profit: 40 };
+        startNpcWar(settlements[1], a); startNpcWar(settlements[2], settlements[3]);
+        journal(); out.journal = fit(); out.scrolls = document.getElementById('dialog').scrollHeight > document.getElementById('dialog').clientHeight; closeDialog();
+        exitTown(); state.x = HOME.x + 2; state.y = HOME.y; interact(); out.caravan = fit(); closeDialog();
+        return out;
+      });
+      assert.deepEqual([r.hall, r.journal, r.caravan], [true, true, true], JSON.stringify(viewport) + ' ' + JSON.stringify(r));
+    }, viewport);
+  }
+});
