@@ -9,9 +9,21 @@ function settlementColor(id) {
   const i = settlements.findIndex(s => s.id === id);
   return i < 0 ? '#9aa5b1' : SETTLEMENT_COLORS[i % SETTLEMENT_COLORS.length];
 }
+// Who ultimately rules a settlement: itself, or 'home' (Brackenford) for anything you have annexed, or whoever annexed it.
+function ownerRoot(id) {
+  let cur = id || 'home';
+  for (let guard = 0; guard < 8; guard++) {
+    const s = townById(cur);
+    if (!s || !s.owner) return cur;
+    if (s.owner === 'player') return 'home';
+    cur = s.owner;
+  }
+  return cur;
+}
+// A settlement's people wear the colour of whoever rules it, so an annexed settlement's workers change sides on the map.
 // Overworld workers are named "home:..." or "<settlement id>:worker:n".
-function workerColor(workerId) { return settlementColor(String(workerId).split(':')[0]); }
-function currentColor() { return settlementColor(state.visiting || 'home'); }
+function workerColor(workerId) { return settlementColor(ownerRoot(String(workerId).split(':')[0])); }
+function currentColor() { return settlementColor(ownerRoot(state.visiting || 'home')); }
 function swatch(id) { return '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + settlementColor(id) + ';margin-right:6px;vertical-align:middle"></span>'; }
 const SIZE_NAMES = ['Hamlet', 'Village', 'Town', 'Large town', 'City'];
 
@@ -82,13 +94,21 @@ function syncNpcPeople() {
   const t = npcMap(), s = townById(state.visiting), total = Math.min(26, Math.max(2, s.people));
   if (townPeople.length === total && townPeople[0] && townPeople[0].town === t.id) return townPeople;
   const rnd = seededRng(strHash(s.id) + 99), plots = Object.values(t.plots), homes = plots.filter(p => p.kind === 'house'), market = plots.find(p => p.kind === 'market'), inn = plots.find(p => p.kind === 'inn');
-  const guards = Math.floor(total / 4), taken = new Set([state.x + ',' + state.y]), spot = () => [t.cx - 2 + Math.floor(rnd() * 6), t.py - 2 + Math.floor(rnd() * 5)];
+  const guards = Math.floor(total / 4), taken = new Set([state.x + ',' + state.y]), claimed = new Set();
+  const plazaBase = k => [t.cx - 2 + Math.floor(rnd() * 6), t.py - 2 + Math.floor(rnd() * 5)];
   townPeople = [];
   for (let i = 0; i < total; i++) {
-    const guard = i < guards, home = guard ? t.patrol[i % 4] : homes.length ? homes[i % homes.length].front : spot();
-    const stop = (i % 2 ? market : inn) || market || inn, targets = guard ? t.patrol.map((_, k) => t.patrol[(k + i) % 4]) : [home, spot(), stop ? stop.front : spot()];
-    const [x, y] = freeSpotNear(home[0], home[1], taken); taken.add(x + ',' + y);
-    townPeople.push({ id: 'c' + i, town: t.id, name: personName(i + (strHash(s.id) % 40)), job: guard ? 'guard' : 'villager', idx: i, x, y, targets, ti: 0, path: [], wait: Math.floor(rnd() * 4) });
+    const guard = i < guards, spots = [];
+    let targets;
+    if (guard) {
+      const route = t.patrol.map(c => claimSpot(c, claimed)), k = i % 4;
+      spots.push(...route); targets = route.map((_, j) => route[(j + k) % 4]);
+    } else {
+      const home = homes.length ? claimSpot(homes[i % homes.length].front, claimed) : claimSpot(plazaBase(i), claimed), wander = claimSpot(plazaBase(i + 1), claimed), stop = (i % 2 ? market : inn) || market || inn;
+      spots.push(home, wander); targets = [home, wander, stop ? stop.front : wander];
+    }
+    const [x, y] = freeSpotNear(targets[0][0], targets[0][1], taken); taken.add(x + ',' + y);
+    townPeople.push({ id: 'c' + i, n: i, town: t.id, name: personName(i, s.id), job: guard ? 'guard' : 'villager', idx: i, x, y, targets, spots, ti: 0, path: [], wait: Math.floor(rnd() * 4), stuck: 0 });
   }
   return townPeople;
 }
@@ -188,7 +208,7 @@ function innDialog(s) {
   const cost = 5 + (s.bias || 0);
   showDialog('<h2>' + esc(s.name) + ' inn</h2><p>A warm bed and a hot meal. Spend the night and your hearts are restored; the day moves on.</p><button ' + (state.coin >= cost ? '' : 'disabled') + ' onclick="paidRest(\'' + s.id + '\')">Rest for the night · ' + cost + ' coin</button><button onclick="closeDialog()">Leave</button>');
 }
-const FAMILIES = ['Ashby', 'Brook', 'Calder', 'Dunn', 'Edgar', 'Fenn', 'Garrow', 'Hale', 'Ives', 'Jarrow', 'Keene', 'Lorne', 'Marsh', 'Nolan', 'Orme', 'Pike'];
+const FAMILIES = LAST_NAMES;
 function houseDialog(s, p) {
   const h = strHash(s.id + p.x0 + ',' + p.y0), family = FAMILIES[h % FAMILIES.length];
   const lines = ['The ' + family + ' family keeps a tidy home. Someone peers out and waves you on.', 'The door opens a crack: “Trading is at the market, and the inn will put you up. We keep to ourselves.”', 'Smoke curls from the chimney. The ' + family + 's are at supper and would rather not be disturbed.'];

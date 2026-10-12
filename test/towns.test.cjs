@@ -60,7 +60,7 @@ test('a World map button is always in the menu outside caves, dungeons and mines
 test('the world map shows what you have explored and found, and fast travel is only offered from inside a settlement', () => game(async page => {
   const r = await page.evaluate(() => {
     const [a, b] = discover(2); state.coin = 500;
-    for (let y = a.y - 6; y <= a.y + 6; y++) for (let x = a.x - 6; x <= a.x + 6; x++) state.explored[y][x] = true;
+    for (let y = Math.max(0, a.y - 6); y <= Math.min(WORLD_H - 1, a.y + 6); y++) for (let x = Math.max(0, a.x - 6); x <= Math.min(WORLD_W - 1, a.x + 6); x++) state.explored[y][x] = true;
     state.x = HOME.x + 15; state.y = HOME.y; openMap();
     const cv = document.getElementById('worldmap'), px = (x, y) => [...cv.getContext('2d').getImageData(x * 3 + 1, y * 3 + 1, 1, 1).data.slice(0, 3)];
     const dark = px(2, 2).join(), seen = px(a.x - 3, a.y + 3).join(), marker = px(a.x, a.y).join();
@@ -93,8 +93,8 @@ test('settlements get a colour each, workers wear it, and Brackenford has its ow
 test('workers on the overworld wear their own settlement’s colour, in sprites and in text', () => game(async page => {
   const r = await page.evaluate(() => {
     const [s] = discover(1); ground(s.x - 7, s.y - 7, s.x + 7, s.y + 7);
-    for (let y = s.y - 8; y <= s.y + 8; y++) for (let x = s.x - 8; x <= s.x + 8; x++) state.explored[y][x] = true;
-    state.x = s.x + 3; state.y = s.y + 3; syncWorkers(); useGfx = false; render();
+    for (let y = Math.max(0, s.y - 8); y <= Math.min(WORLD_H - 1, s.y + 8); y++) for (let x = Math.max(0, s.x - 8); x <= Math.min(WORLD_W - 1, s.x + 8); x++) state.explored[y][x] = true;
+    state.x = Math.min(WORLD_W - 2, s.x + 3); state.y = Math.min(WORLD_H - 2, s.y + 3); syncWorkers(); useGfx = false; render();
     const spans = [...document.querySelectorAll('#map .worker')].map(e => e.style.color);
     useGfx = true; render();
     return { spans: spans.length, colors: [...new Set(spans)], expected: settlementColor(s.id) };
