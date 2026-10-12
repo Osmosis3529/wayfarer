@@ -235,20 +235,61 @@ function buyUpgrade(key) {
 }
 
 // ---------------------------------------------------------------- citizens in the settlement
-const TOWN_NAMES = ['Mara', 'Rowan', 'Tilda', 'Eren', 'Sola', 'Hale', 'Mira', 'Doss', 'Tomas', 'Elsa', 'Perrin', 'Sella', 'Jory', 'Olan', 'Tess', 'Harlan', 'Dara', 'Borin', 'Veya', 'Rusk', 'Mina', 'Orrin', 'Lysa', 'Corren', 'Bram', 'Nella', 'Keza', 'Dren', 'Fen', 'Salla', 'Hobb', 'Wren', 'Isolde', 'Garrick', 'Pell', 'Anwen', 'Torin', 'Maeve', 'Bryn', 'Cassia', 'Dunstan', 'Ebba', 'Fenwick', 'Greta', 'Holt', 'Ilsa', 'Jarek', 'Kestrel'];
+// Names. Every world draws its own: state.nameSeed (saved with the game) shuffles these pools, and each settlement gets
+// its own shuffle, so nobody in two worlds, or two settlements, shares a name by accident.
+const FIRST_NAMES = ['Mara', 'Rowan', 'Tilda', 'Eren', 'Sola', 'Hale', 'Mira', 'Doss', 'Tomas', 'Elsa', 'Perrin', 'Sella', 'Jory', 'Olan', 'Tess', 'Harlan', 'Dara', 'Borin', 'Veya', 'Rusk', 'Mina', 'Orrin', 'Lysa', 'Corren', 'Bram', 'Nella', 'Keza', 'Dren', 'Fen', 'Salla', 'Hobb', 'Wren', 'Isolde', 'Garrick', 'Pell', 'Anwen', 'Torin', 'Maeve', 'Bryn', 'Cassia', 'Dunstan', 'Ebba', 'Fenwick', 'Greta', 'Holt', 'Ilsa', 'Jarek', 'Kestrel',
+  'Aldric', 'Brigid', 'Cael', 'Delia', 'Edric', 'Fiora', 'Gwen', 'Hugo', 'Iona', 'Joss', 'Kara', 'Lorcan', 'Mabel', 'Nial', 'Odette', 'Piers', 'Quill', 'Rhea', 'Soren', 'Thea', 'Ulric', 'Vesna', 'Willa', 'Xander', 'Yara', 'Zeph', 'Ansel', 'Bess', 'Corin', 'Dilys', 'Emrys', 'Frida', 'Gareth', 'Hana', 'Ivo', 'Jenna', 'Kelda', 'Leif', 'Marek', 'Nessa', 'Osric', 'Petra', 'Quinn', 'Rurik', 'Signe', 'Teague', 'Una', 'Viktor', 'Wynne', 'Yorick',
+  'Alma', 'Bertil', 'Calla', 'Dag', 'Elin', 'Finn', 'Gisla', 'Halvard', 'Ingrid', 'Jonas', 'Kirsa', 'Lars', 'Marit', 'Nils', 'Oda', 'Per', 'Runa', 'Sten', 'Tove', 'Ulla', 'Vidar', 'Wilda', 'Ylva', 'Arvid'];
+const LAST_NAMES = ['Ashby', 'Brook', 'Calder', 'Dunn', 'Edgar', 'Fenn', 'Garrow', 'Hale', 'Ives', 'Jarrow', 'Keene', 'Lorne', 'Marsh', 'Nolan', 'Orme', 'Pike', 'Archer', 'Baker', 'Carter', 'Dyer', 'Fisher', 'Gardener', 'Hunter', 'Miller', 'Fletcher', 'Mason', 'Potter', 'Reeve', 'Smith', 'Thatcher', 'Walker', 'Weaver', 'Wright', 'Barlow', 'Cobb', 'Draper', 'Ellis', 'Foster', 'Gray', 'Heath', 'Irwin', 'Lowe', 'Moss', 'Nash', 'Oakes', 'Penn', 'Rudd', 'Shaw', 'Tull', 'Vane', 'Wick', 'Yates'];
+const nameLists = new Map();
+function nameList(scope) {
+  const key = (state.nameSeed || 0) + ':' + scope;
+  if (!nameLists.has(key)) {
+    const rnd = seededRng(strHash(key)), shuffle = a => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
+    nameLists.set(key, { first: shuffle(FIRST_NAMES), last: shuffle(LAST_NAMES) });
+  }
+  return nameLists.get(key);
+}
+// The i-th citizen of a settlement (scope is its id, or 'home'): everyone in one settlement has a different first name.
+function personName(i, scope = 'home') { const { first, last } = nameList(scope), F = first.length; return first[i % F] + ' ' + last[(i * 7 + Math.floor(i / F)) % last.length]; }
+// The first name of whoever runs a building or does a deed in Brackenford's stories.
+function keeperName(key) { const { first } = nameList('home'); return first[strHash('keeper:' + key) % first.length]; }
 let townPeople = [];
-function personName(i) { return TOWN_NAMES[i % TOWN_NAMES.length] + (i >= TOWN_NAMES.length ? ' ' + ['II', 'III', 'IV', 'V'][Math.floor(i / TOWN_NAMES.length) - 1] : ''); }
 function homeSpot(job, idx) {
   if (job === 'idle') return [26 + (idx % 8), 16 + (idx % 9)];
   if (job === 'barracks') return TOWN_PATROL[idx % TOWN_PATROL.length];
   return TOWN_PLOTS[job].front;
 }
-function targetsFor(job, idx) {
-  if (job === 'idle') return [[26 + (idx * 3) % 8, 16 + (idx * 5) % 9], [27 + (idx * 7) % 7, 17 + (idx * 2) % 7]];
-  if (job === 'barracks') return TOWN_PATROL.map((_, k) => TOWN_PATROL[(k + idx) % TOWN_PATROL.length]);
-  if (TOWN_WORKSITES[job]) return [TOWN_PLOTS[job].front, TOWN_WORKSITES[job]];
-  return [TOWN_PLOTS[job].front, [28 + (idx % 6), 17 + (idx % 3)]];
+// Places to stand about on the plaza: every other tile, so there is always a gap to walk through.
+const PLAZA = []; for (let y = 16; y <= 24; y++) for (let x = 25; x <= 34; x++) if ((x + y) % 2 === 0) PLAZA.push([x, y]);
+// Three rings of soldiers around the plaza (the first is the roads around it), all walking the same way so they never meet head-on.
+const PATROL_LANES = [TOWN_PATROL, [[25, 16], [34, 16], [34, 24], [25, 24]], [[27, 18], [32, 18], [32, 22], [27, 22]]];
+// The nearest tile to base that is not already somebody's waiting spot, off the roads if there is any choice: people
+// who stand about on a one-tile road stop everyone else.
+function claimSpot(base, claimed) {
+  const m = getTownMap();
+  for (const allowRoad of [false, true]) for (let r = 0; r <= 10; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+    const x = base[0] + dx, y = base[1] + dy, g = m[y] && m[y][x];
+    if (!g || !townWalkable(g) || (g === '▒' && !allowRoad) || claimed.has(x + ',' + y)) continue;
+    claimed.add(x + ',' + y);
+    return [x, y];
+  }
+  return base;
 }
+// Every citizen has a number n (their place in the list) that decides where on the plaza they like to stand, and waiting
+// spots of their own. A worker goes to the door, then to the worksite; a soldier walks a ring; the rest stand about.
+function targetsFor(job, p, claimed) {
+  const n = p.n || 0, plaza = k => claimSpot(PLAZA[(n * 7 + k) % PLAZA.length], claimed);
+  if (job === 'idle') { const a = plaza(0), b = plaza(23); p.spots = [a, b]; return [a, b]; }
+  if (job === 'barracks') {
+    const lane = ((p.idx || 1) - 1) % PATROL_LANES.length, route = lane === 0 ? PATROL_LANES[0] : PATROL_LANES[lane].map(c => claimSpot(c, claimed)), k = n % 4;     // the road ring is walked, never waited on
+    p.spots = lane === 0 ? [] : route; return route.map((_, i) => route[(i + k) % 4]);
+  }
+  const front = TOWN_PLOTS[job].front, site = TOWN_WORKSITES[job] ? claimSpot(TOWN_WORKSITES[job], claimed) : plaza(0);
+  p.spots = [site]; return [front, site];
+}
+function claimedSpots(except) { const c = new Set(); for (const q of townPeople) if (q !== except && q.spots) for (const t of q.spots) c.add(t[0] + ',' + t[1]); return c; }
 function freeSpotNear(x, y, taken) {
   for (let r = 0; r <= 8; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
     if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
@@ -257,7 +298,7 @@ function freeSpotNear(x, y, taken) {
   }
   return [x, y];
 }
-function retarget(p, job) { p.job = job; p.targets = targetsFor(job, p.idx); p.ti = 0; p.path = []; p.wait = 0; }
+function retarget(p, job) { p.job = job; p.spots = []; p.targets = targetsFor(job, p, claimedSpots(p)); p.ti = 0; p.path = []; p.wait = 0; p.stuck = 0; }
 // Keeps every citizen where they are; only people whose job changed get new routes.
 function syncTownPeople() {
   ensureSettlementState();
@@ -270,8 +311,8 @@ function syncTownPeople() {
   const free = [];
   for (const p of townPeople) { if (p.job !== 'idle' && left[p.job] > 0) left[p.job]--; else free.push(p); }
   while (townPeople.length < total) {
-    const i = townPeople.length, p = { id: 'c' + i, name: personName(i), job: 'idle', idx: i, x: 0, y: 0, targets: [], ti: 0, path: [], wait: 0 };
-    p.targets = targetsFor('idle', i);
+    const i = townPeople.length, p = { id: 'c' + i, n: i, name: personName(i, state.visiting || 'home'), job: 'idle', idx: i, x: 0, y: 0, targets: [], spots: [], ti: 0, path: [], wait: 0, stuck: 0 };
+    p.targets = targetsFor('idle', p, claimedSpots(p));
     const [x, y] = freeSpotNear(...homeSpot('idle', i), taken); p.x = x; p.y = y; taken.add(x + ',' + y);
     townPeople.push(p); free.push(p);
   }
@@ -285,22 +326,72 @@ function syncTownPeople() {
 }
 function personAt(x, y) { return townPeople.find(p => p.x === x && p.y === y) || null; }
 function townPeopleMap() { const m = new Map(); for (const p of townPeople) m.set(p.x + ',' + p.y, p); return m; }
+// A path that goes around the tiles in `blocked` (people standing in the way).
+function townPathAvoid(from, to, blocked) {
+  const m = getTownMap(), prev = new Map(), q = [from], W = m[0].length, id = (x, y) => y * W + x;
+  prev.set(id(from[0], from[1]), null);
+  for (let h = 0; h < q.length; h++) {
+    const [x, y] = q[h];
+    if (x === to[0] && y === to[1]) break;
+    for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+      const nx = x + dx, ny = y + dy;
+      if (!m[ny] || !townWalkable(m[ny][nx]) || prev.has(id(nx, ny)) || (blocked.has(nx + ',' + ny) && !(nx === to[0] && ny === to[1]))) continue;
+      prev.set(id(nx, ny), [x, y]); q.push([nx, ny]);
+    }
+  }
+  if (!prev.has(id(to[0], to[1]))) return null;
+  const path = []; let cur = [to[0], to[1]];
+  while (cur && !(cur[0] === from[0] && cur[1] === from[1])) { path.unshift(cur); cur = prev.get(id(cur[0], cur[1])); }
+  return path;
+}
+let townTick = 0;
+// Citizens walk their routes without getting in each other's way: nobody stands about on a road, people who meet head-on
+// swap places, anybody blocked for a moment goes around, and a person who is stuck for good passes through.
 function moveTownPeople() {
-  const taken = new Set(townPeople.map(p => p.x + ',' + p.y));
-  taken.add(state.x + ',' + state.y);
-  for (const p of townPeople) {
+  const n = townPeople.length, at = new Map(), PLAYER = { player: true };
+  for (const p of townPeople) at.set(p.x + ',' + p.y, p);
+  at.set(state.x + ',' + state.y, PLAYER);
+  const put = (p, x, y) => { at.delete(p.x + ',' + p.y); noteStep(p.id, x - p.x); p.x = x; p.y = y; at.set(x + ',' + y, p); };
+  const road = (x, y) => getTownMap()[y] && getTownMap()[y][x] === '▒';
+  townTick++;
+  for (let k = 0; k < n; k++) {
+    const p = townPeople[(k + townTick) % n];
     if (p.wait > 0) { p.wait--; continue; }
     if (!p.path.length) {
       p.ti = (p.ti + 1) % p.targets.length;
-      p.path = townPath([p.x, p.y], p.targets[p.ti]);
-      p.wait = 1 + (townHash(p.x + p.ti, p.y + state.day) % 4);
+      const to = p.targets[p.ti], blocked = new Set(at.keys()); blocked.delete(p.x + ',' + p.y);
+      p.path = townPathAvoid([p.x, p.y], to, blocked) || townPath([p.x, p.y], to);
+      p.wait = road(p.x, p.y) ? 0 : 3 + (townHash(p.x + p.ti, p.y + state.day) % 5);
+      p.stuck = 0;
       continue;
     }
-    const [nx, ny] = p.path[0], key = nx + ',' + ny;
-    if (taken.has(key)) continue;
-    taken.delete(p.x + ',' + p.y); taken.add(key);
-    noteStep(p.id, nx - p.x);
-    p.x = nx; p.y = ny; p.path.shift();
+    const [nx, ny] = p.path[0], other = at.get(nx + ',' + ny);
+    if (!other) { put(p, nx, ny); p.path.shift(); p.stuck = 0; continue; }
+    p.stuck = (p.stuck || 0) + 1;
+    // two people heading for each other's tile: trade places
+    if (!other.player && other.wait <= 0 && other.path && other.path.length && other.path[0][0] === p.x && other.path[0][1] === p.y) {
+      const ox = other.x, oy = other.y, px = p.x, py = p.y;
+      at.delete(px + ',' + py); at.delete(ox + ',' + oy);
+      noteStep(p.id, ox - px); noteStep(other.id, px - ox);
+      p.x = ox; p.y = oy; other.x = px; other.y = py; at.set(ox + ',' + oy, p); at.set(px + ',' + py, other);
+      p.path.shift(); other.path.shift(); p.stuck = other.stuck = 0;
+      continue;
+    }
+    if (p.stuck < 2) continue;
+    // somebody is standing there: go around them, or give up on a goal that is taken
+    const goal = p.path[p.path.length - 1], blocked = new Set(at.keys()); blocked.delete(p.x + ',' + p.y);
+    if (p.path.length === 1 && p.stuck >= 3) { p.path = []; continue; }
+    const around = townPathAvoid([p.x, p.y], goal, blocked);
+    if (around && around.length && !at.has(around[0][0] + ',' + around[0][1])) { p.path = around; put(p, around[0][0], around[0][1]); p.path.shift(); p.stuck = 0; continue; }
+    if (!other.player && other.wait > 0 && p.stuck >= 3) other.wait = 0;       // hurry the person in the way along
+    if (p.stuck >= 6) {                                                        // nothing else works: pass through
+      if (other.player) { p.path = []; p.stuck = 0; continue; }
+      const ox = other.x, oy = other.y, px = p.x, py = p.y;
+      at.delete(px + ',' + py); at.delete(ox + ',' + oy);
+      noteStep(p.id, ox - px); noteStep(other.id, px - ox);
+      p.x = ox; p.y = oy; other.x = px; other.y = py; at.set(ox + ',' + oy, p); at.set(px + ',' + py, other);
+      p.path.shift(); other.path = []; other.wait = 0; p.stuck = 0;
+    }
   }
 }
 

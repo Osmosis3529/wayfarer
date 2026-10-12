@@ -306,7 +306,7 @@ test('natural enemy spawning does not count war armies and raiders against its c
   assert.equal(r.after, r.before + 1);
 }));
 
-test('settlements go to war: citizens die and buildings burn, nobody is annexed, and the loser starts again with two citizens and nothing built', () => game(async page => {
+test('settlements go to war: citizens die and buildings burn, the winner annexes the loser, and the loser starts again with two citizens and nothing built', () => game(async page => {
   const r = await page.evaluate(() => {
     const [a, b] = [settlements[0], settlements[1]]; ensureWarWorld(); state.day = 10;
     for (const s of settlements) { s.owner = null; s.stock = {}; }
@@ -314,13 +314,13 @@ test('settlements go to war: citizens die and buildings burn, nobody is annexed,
     const w = startNpcWar(a, b); const listed = state.npcWars.length;
     const real = Math.random; Math.random = () => 0.9;
     let days = 0; try { while (state.npcWars.includes(w) && days < 20) { state.day++; npcWarTurn(); days++; } } finally { Math.random = real; }
-    const plots = Object.keys(buildNpcTown(b).plots).length;
+    const plots = Object.keys(buildNpcTown(b).plots).length, ruler = b.owner;
     // before day 7 the world starts no new wars, so only the rebuilding is measured
     state.day = 5; const regrown = []; for (let i = 0; i < 30; i++) { worldTurn(); regrown.push(Object.keys(buildNpcTown(b).plots).length); }
-    return { listed, over: !state.npcWars.includes(w), days, a: [a.people, a.owner], b: [b.people, b.owner, b.wreck], plots, loot: { gems: a.stock.gems, gold: a.stock.gold }, emptied: Object.keys(b.stock).length, regrown, news: state.log.some(l => l.t.includes('has won the war')) };
+    return { listed, over: !state.npcWars.includes(w), days, a: [a.people, a.owner], b: [b.people, ruler, b.wreck], plots, loot: { gems: a.stock.gems, gold: a.stock.gold }, emptied: Object.keys(b.stock).length, regrown, news: state.log.some(l => l.t.includes('has won the war')) };
   });
   assert.equal(r.listed, 1); assert.equal(r.over, true); assert.ok(r.days >= 1 && r.days <= 8, 'days ' + r.days);
-  assert.ok(r.a[0] >= 8 && r.a[1] === null); assert.equal(r.b[0] >= 2, true); assert.equal(r.b[1], null);
+  assert.ok(r.a[0] >= 8 && r.a[1] === null); assert.equal(r.b[0] >= 2, true); assert.equal(r.b[1], 'town_0', 'the winner rules the loser');
   assert.equal(r.plots, 0, 'every building of the loser is gone'); assert.equal(r.loot.gems >= 30 && r.loot.gold >= 20, true);
   assert.ok(r.regrown[r.regrown.length - 1] > 0 && r.regrown.every((n, i) => i === 0 || n >= r.regrown[i - 1]), JSON.stringify(r.regrown));
 }));

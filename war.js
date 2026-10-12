@@ -261,10 +261,12 @@ function annex(id) {
   if (!s) return;
   { const nw = warOf(id); if (nw) endNpcWar(nw, nw.d, 'draw'); }
   const loot = 20 + (w ? w.size : 3) * 3;
+  const freed = subjectsOf(id);
+  for (const t of freed) t.owner = null;                      // the settlements it ruled are free of it
   s.owner = 'player'; s.people = 2; s.cap = Math.max(s.cap || 3, 3); s.wreck = 0; s.stock = {};
   state.coin += loot;
   if (typeof makeColony === 'function') makeColony(s);
-  say(s.name + ' is yours: ' + loot + ' coin in plunder, and two survivors who will take your orders. It has no buildings left, so raise them as you would in Brackenford.', 'gold');
+  say(s.name + ' is yours: ' + loot + ' coin in plunder, and two survivors who will take your orders. It has no buildings left, so raise them as you would in Brackenford. Its workers now wear Brackenford’s colour.' + (freed.length ? ' ' + freed.map(t => t.name).join(' and ') + ', which it ruled, ' + (freed.length === 1 ? 'is' : 'are') + ' free again.' : ''), 'gold');
   render();
 }
 function noteKill(foe) {
@@ -429,9 +431,10 @@ function hostilityTurn() {
 }
 
 // ---------------------------------------------------------------- wars between settlements
-// Settlements fight each other, with citizens dying and buildings burning, but never take one another over. A war ends
-// when one side has no citizens left: the winner takes the loser's stores, and the loser starts again with two
-// citizens and no buildings. You can help either side.
+// Settlements fight each other, with citizens dying and buildings burning. A war ends when one side has no citizens
+// left: the winner takes the loser's stores and annexes it (it is ruled by the winner from then on, and its people wear
+// the winner's colour), and the loser starts again with two citizens and no buildings. A settlement that already rules
+// three others does not annex more, and a ruled settlement sometimes rebels. You can help either side.
 function warById(id) { return (state.npcWars || []).find(w => w.id === id) || null; }
 function warOf(id) { return (state.npcWars || []).find(w => w.a === id || w.d === id) || null; }
 function inWar(id) { return !!warOf(id) || !!(state.wars && state.wars[id]); }
@@ -444,6 +447,14 @@ function startNpcWar(a, d) {
   if (known) say('War! ' + a.name + ' has marched on ' + d.name + '.', isAlly(d.id) ? 'alert' : '');
   if (isAlly(d.id)) callForAid(d, a);
   return w;
+}
+const MAX_SUBJECTS = 3;
+function subjectsOf(id) { return settlements.filter(t => t.owner === id); }
+function annexByNpc(win, lose) {
+  lose.owner = win.id;
+  for (const t of settlements) if (t.owner === lose.id) t.owner = win.id;       // a conquered ruler's subjects pass to the conqueror
+  delete state.hostile[lose.id];
+  if (isAlly(lose.id)) breakAlliance(lose.id, lose.name + ' has been annexed by ' + win.name + ', and your alliance with it ends.');
 }
 function stockOf(s) { return s.stock || (s.stock = {}); }
 // A settlement that falls respawns with two citizens and none of its buildings; they come back one by one.
@@ -463,7 +474,9 @@ function endNpcWar(w, winnerId, how) {
   for (const [k, n] of Object.entries(loot)) { stockOf(win)[k] = Math.min(60, (stockOf(win)[k] || 0) + n); if (n) parts.push(n + ' ' + itemNames[k].toLowerCase()); }
   respawnSettlement(lose);
   win.people = Math.max(win.people, Math.min((win.cap || 8) + 3, win.people + 1));      // victors take in a few of the vanquished, but never shrink
-  if (known) say(win.name + ' has won the war against ' + lose.name + (parts.length ? ' and carries off ' + parts.join(', ') : '') + '. ' + lose.name + ' is left in ruins; two survivors start again.', isAlly(lose.id) ? 'alert' : 'gold');
+  const annexed = !win.owner && !lose.owner && subjectsOf(win.id).length < MAX_SUBJECTS;
+  if (annexed) annexByNpc(win, lose);
+  if (known) say(win.name + ' has won the war against ' + lose.name + (parts.length ? ' and carries off ' + parts.join(', ') : '') + '. ' + (annexed ? lose.name + ' is annexed and ruled by ' + win.name + ' now; two survivors start again among the ruins.' : lose.name + ' is left in ruins; two survivors start again.'), isAlly(lose.id) ? 'alert' : 'gold');
   if (w.you) {
     const mine = (w.you === 'a') === (winnerId === w.a);
     if (mine) {
@@ -493,12 +506,12 @@ function npcWarTurn() {
 function maybeStartNpcWar() {
   if (!state.npcWars) state.npcWars = [];
   if (state.npcWars.length >= 3 || state.day <= 3 || Math.random() >= 0.22) return;
-  const free = settlements.filter(s => s.owner !== 'player' && s.people >= 3 && !warOf(s.id) && !(state.wars && state.wars[s.id]));
+  const free = settlements.filter(s => !s.owner && s.people >= 3 && !warOf(s.id) && !(state.wars && state.wars[s.id]));
   if (free.length < 2) return;
   const weights = free.map(s => 0.2 + (s.aggression || 0)), total = weights.reduce((p, q) => p + q, 0);
   let roll = Math.random() * total, a = free[free.length - 1];
   for (let i = 0; i < free.length; i++) { roll -= weights[i]; if (roll < 0) { a = free[i]; break; } }
-  const rivals = rivalsOf(a).filter(t => free.includes(t) && t.owner !== 'player'), near = free.filter(t => t !== a && Math.hypot(t.x - a.x, t.y - a.y) <= 70);
+  const rivals = rivalsOf(a).filter(t => free.includes(t)), near = free.filter(t => t !== a && Math.hypot(t.x - a.x, t.y - a.y) <= 70);
   const pool = rivals.length && Math.random() < 0.65 ? rivals : near;
   if (pool.length) startNpcWar(a, pool[Math.floor(Math.random() * pool.length)]);
 }
@@ -592,6 +605,12 @@ function worldTurn() {
     // what a settlement holds is what a winner takes: a few of its plentiful goods pile up each day
     const st = stockOf(s); for (const k of (s.surplus || [])) st[k] = Math.min(40, (st[k] || 0) + Math.max(1, Math.round(s.people / 4)));
     if (s.wreck > 0 && !warOf(s.id) && Math.random() < .7) s.wreck = Math.max(0, s.wreck - 1 - Math.floor(s.people / 6));
+  }
+  for (const s of settlements) {
+    if (!s.owner || s.owner === 'player') continue;
+    const o = townById(s.owner);
+    if (!o) { s.owner = null; continue; }
+    if (s.people >= 4 && Math.random() < 0.015) { s.owner = null; if (s.discovered || o.discovered) say(s.name + ' throws off ' + o.name + '’s rule and is independent again.'); }
   }
   raidDeadline(); hostilityTurn(); aidTurn(); npcWarTurn();
   if (state.day <= 6) return;

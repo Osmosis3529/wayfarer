@@ -561,7 +561,7 @@ test('the market, longhouse and caravan post are on the settlement map, with cos
   assert.deepEqual(r.names, { market: 'Market', longhouse: 'Longhouse', caravanPost: 'Caravan post', hall: 'Hall' });
   assert.deepEqual(r.plots, [['longhouse', true, true, true, false], ['caravanPost', true, true, true, false]]);
   assert.ok(r.prompt.includes('Empty plot') && r.prompt.includes('longhouse'), r.prompt);
-  assert.ok(r.shop.includes('Mara’s Market') && !/trading post/i.test(r.shop), r.shop);
+  assert.ok(/’s Market/.test(r.shop) && !/trading post/i.test(r.shop), r.shop);
   assert.ok(r.text.includes('longhouse'), r.text);
 }));
 
