@@ -305,7 +305,7 @@ function warCouncil() {
   const rows = known.map(s => {
     const dist = Math.round(Math.hypot(s.x - HOME.x, s.y - HOME.y)), w = state.wars[s.id];
     const act = s.owner === 'player' ? '<em>annexed</em>' : w ? (w.cleared ? '<em>walk in to claim it</em>' : '<span>' + w.left + ' / ' + w.total + '</span> <button onclick="sueForPeace(\'' + s.id + '\')">Peace · ' + peaceCost(s.id) + '</button>') : isAlly(s.id) ? '<em>ally</em>' : '<button onclick="declareWar(\'' + s.id + '\');warCouncil()">Declare war</button>';
-    const note = [dist + ' leagues', s.people + ' citizens', moodOf(s), isHostile(s.id) ? 'at war with you' : '', ownerText(s)].filter(Boolean).join(' · ');
+    const note = [dist + ' leagues', s.people + ' citizens (' + scaleOf(s.people) + (npcWalls(s) ? ', walled' : '') + ')', moodOf(s), isHostile(s.id) ? 'at war with you' : '', ownerText(s)].filter(Boolean).join(' · ');
     return '<div class="up-row"><span>' + esc(s.name) + '<br><em>' + esc(note) + '</em></span><span>' + act + '</span></div>';
   }).join('') || '<p>You have not found any settlements yet. Explore the Briarwood.</p>';
   const raid = state.raid ? '<p><strong>' + (state.raid.war ? 'A warband' : 'Raiders') + ' from ' + esc(state.raid.name) + '</strong> threaten Brackenford: ' + state.raid.left + ' of ' + state.raid.total + ' still at large.</p>' : '';
@@ -411,13 +411,15 @@ function endRaid() {
 // Raiders still out when the deadline comes reach the town; each soldier on duty stops one of them at the gate.
 function raidDeadline() {
   if (!state.raid || state.day < state.raid.deadline) return;
-  let guards = state.built.barracks ? soldierCount() : 0, stopped = 0;
+  let guards = state.built.barracks ? soldierCount() : 0, stopped = 0, walled = 0;
   for (const [x, y] of raiderTiles()) {
     if (!state.raid) break;
     if (guards > 0) { guards--; stopped++; removeEnemyData(overworld, x, y); overworld[y][x] = '.'; state.raid.left--; state.raid.killed++; }
+    else if (wallHolds()) { wallDamage(homeWall(), 6); walled++; removeEnemyData(overworld, x, y); overworld[y][x] = '.'; state.raid.left--; state.raid.killed++; }
     else raiderLoots(x, y);
   }
   if (stopped) say('Your soldiers stop ' + stopped + ' raider' + (stopped === 1 ? '' : 's') + ' at the gates.', 'gold');
+  if (walled) say('The wall turns back ' + walled + ' raider' + (walled === 1 ? '' : 's') + '.', 'gold');
   if (state.raid && state.raid.left <= 0) endRaid();
   state.raid = null;
 }
@@ -494,9 +496,9 @@ function npcWarTurn() {
   for (const w of [...state.npcWars]) {
     const a = townById(w.a), d = townById(w.d);
     if (!a || !d || a.owner === 'player' || d.owner === 'player') { state.npcWars = state.npcWars.filter(x => x !== w); continue; }
-    const ap = a.people * (0.8 + Math.random() * 0.8) * (1 + (a.aggression || 0)), dp = d.people * (0.8 + Math.random() * 0.8) * 1.15 * (1 + 0.35 * (w.aid || 0));
+    const ap = a.people * (0.8 + Math.random() * 0.8) * (1 + (a.aggression || 0)), dp = d.people * (0.8 + Math.random() * 0.8) * 1.15 * (1 + 0.35 * (w.aid || 0)) * npcWallBonus(d);
     const hurt = (s, n, burn) => { s.people = Math.max(0, s.people - n); if (burn) s.wreck = (s.wreck || 0) + 1; };
-    if (ap > dp) { hurt(d, 1 + (Math.random() < .5 ? 1 : 0), Math.random() < .6); hurt(a, Math.random() < .35 ? 1 : 0, false); }
+    if (ap > dp) { npcWallHit(d, .2); hurt(d, 1 + (Math.random() < .5 ? 1 : 0), Math.random() < .6); hurt(a, Math.random() < .35 ? 1 : 0, false); }
     else { hurt(a, 1 + (Math.random() < .5 ? 1 : 0), Math.random() < .35); hurt(d, Math.random() < .35 ? 1 : 0, Math.random() < .3); }
     if (d.people <= 0) endNpcWar(w, a.id, 'win');
     else if (a.people <= 0) endNpcWar(w, d.id, 'win');

@@ -90,8 +90,8 @@ test('workers wear the colour of whoever rules their settlement: annexed workers
     for (let y = b.y - 7; y <= b.y + 7; y++) for (let x = b.x - 7; x <= b.x + 7; x++) if (overworld[y] && overworld[y][x] !== undefined && !'SCDKM⌂'.includes(overworld[y][x])) overworld[y][x] = '.';
     state.x = b.x + 3; state.y = b.y + 3; syncWorkers(); useGfx = false; render();
     const spans = [...document.querySelectorAll('#map .worker')].map(e => e.style.color); useGfx = true; render();
-    const hex = settlementColor(a.id).replace('#', ''), rgb = `rgb(${parseInt(hex.slice(0, 2), 16)}, ${parseInt(hex.slice(2, 4), 16)}, ${parseInt(hex.slice(4, 6), 16)})`;
-    out.text = spans.length > 0 && spans.every(x => x === rgb);
+    const css = id => { const hex = settlementColor(id).replace('#', ''); return `rgb(${parseInt(hex.slice(0, 2), 16)}, ${parseInt(hex.slice(2, 4), 16)}, ${parseInt(hex.slice(4, 6), 16)})`; };
+    out.text = spans.includes(css(a.id)) && !spans.includes(css(b.id));   // some other settlement's people may be in view too
     state.x = b.x; state.y = b.y; enterSettlement(b.id); out.inside = currentColor() === settlementColor(a.id);
     return out;
   });

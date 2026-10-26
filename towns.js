@@ -252,7 +252,7 @@ function renderVisitPanel() {
 // A settlement you take is managed with the same dialogs and rules as Brackenford. While you are inside it, the
 // fields that make up a settlement (buildings, jobs, upgrades, pantry, tier) are swapped for its own; your pack, coin
 // and gear are shared. Everything else in the game keeps reading state.built, state.assign and so on as usual.
-const CTX_KEYS = ['built', 'assign', 'up', 'town', 'assignBackup', 'assignReady', 'starving'];
+const CTX_KEYS = ['built', 'assign', 'up', 'town', 'assignBackup', 'assignReady', 'starving', 'wallPct'];
 function isColony(id) { return !!(state.colonies && state.colonies[id]); }
 function colonyIds() { return Object.keys(state.colonies || {}).filter(id => { const s = townById(id); return s && s.owner === 'player'; }); }
 function settleName() { return state.cur ? (townById(state.cur) || { name: 'the settlement' }).name : 'Brackenford'; }
@@ -263,7 +263,7 @@ function peopleOf(s) { return isColony(s.id) ? state.colonies[s.id].town.people 
 function makeColony(s) {
   if (!state.colonies) state.colonies = {};
   const built = {}; for (const k of Object.keys(BUILD_COSTS)) built[k] = false;
-  state.colonies[s.id] = { built, assign: {}, up: {}, town: { people: Math.max(2, Math.floor(s.people) || 2), food: 4, tier: 1 }, assignBackup: null, assignReady: false, starving: false };
+  state.colonies[s.id] = { built, assign: {}, up: {}, town: { people: Math.max(2, Math.floor(s.people) || 2), food: 4, tier: 1 }, assignBackup: null, assignReady: false, starving: false, wallPct: 1 };
 }
 function ensureColonies() {
   if (!state.colonies || typeof state.colonies !== 'object') state.colonies = {};
@@ -408,7 +408,7 @@ function openMap() {
   const rows = settlementList().map(s => {
     const full = s.id === 'home' ? { people: (state.cur ? state.parked : state).town.people, aggression: 0 } : { ...s, people: peopleOf(s) }, visited = isVisited(s);
     const bits = [s.id === 'home' ? 'your home' : Math.round(Math.hypot(s.x - HOME.x, s.y - HOME.y)) + ' leagues from Brackenford'], war = state.wars[s.id];
-    bits.push(full.people + ' citizens');
+    bits.push(full.people + ' citizens' + (s.id === 'home' ? '' : ' (' + scaleOf(full.people) + (npcWalls(s) || (s.owner === 'player' && recordOf(s.id) && recordOf(s.id).built.walls) ? ', walled' : '') + ')'));
     if (s.id !== 'home') bits.push(moodOf(full), visited ? 'visited' : 'not visited yet', war ? 'at war: ' + war.left + ' defenders' : ownerText(s));
     const block = travelBlock(here, s), cost = here && s.id !== here.id ? travelCost(here, s) : 0;
     const action = here && s.id === here.id ? '<em>you are here</em>' : '<button ' + (block ? 'disabled' : '') + ' onclick="travelTo(\'' + s.id + '\')">Ride' + (here ? ' · ' + cost + ' coin' : '') + '</button>';

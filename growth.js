@@ -33,6 +33,7 @@ const SCALE_RANK = { village: 0, town: 1, city: 2 };
 function growSettlements() {
   for (const s of settlements) {
     if (s.owner === 'player' || warOf(s.id) || (state.wars && state.wars[s.id])) continue;
+    npcWallsDay(s);
     const goal = goalOf(s);
     if (s.people >= s.cap && s.cap < goal && Math.random() < GROWTH_PER_DAY) s.cap++;
     if (s.people < s.cap && Math.random() < .4) s.people++;
@@ -62,6 +63,7 @@ function marksOf(s) {
 }
 let markCache = null;
 function refreshMarks() {
+  refreshWalls();
   markCache = new Map();
   const add = (cx, cy, list, visible, id) => { for (const b of list) markCache.set((cx + b.dx) + ',' + (cy + b.dy), { key: b.key, icon: b.icon, id, visible }); };
   add(HOME.x, HOME.y, BUILDING_MARKS.filter(b => (recordOf('home').built || {})[b.key]), true, 'home');

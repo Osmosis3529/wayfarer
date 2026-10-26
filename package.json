@@ -42,6 +42,7 @@
       "dark.js",
       "towns.js",
       "growth.js",
+      "defense.js",
       "diplomacy.js",
       "menu.js",
       "touch.js",

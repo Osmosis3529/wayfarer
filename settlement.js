@@ -13,6 +13,7 @@ const TOWN_PLOTS = {
   mine:         { x0: 52, y0: 10, x1: 57, y1: 13, door: [54, 13], front: [54, 14] },
   garden:       { x0: 12, y0: 10, x1: 16, y1: 13, door: [14, 13], front: [14, 14] },
   beacon:       { x0: 28, y0: 3,  x1: 31, y1: 6,  door: [29, 6],  front: [29, 7] },
+  walls:        { x0: 52, y0: 22, x1: 57, y1: 25, door: [54, 25], front: [54, 26] },
   huntersLodge: { x0: 5,  y0: 15, x1: 10, y1: 18, door: [7, 18],  front: [7, 19] },
   jeweler:      { x0: 39, y0: 15, x1: 44, y1: 18, door: [41, 18], front: [41, 19] },
   barracks:     { x0: 46, y0: 15, x1: 52, y1: 18, door: [49, 18], front: [49, 19] },
@@ -88,7 +89,7 @@ function townPath(from, to) {
 // ---------------------------------------------------------------- economy: tiers, upgrades, jobs
 const HALL_NAMES = ['Hall', 'Town Hall', 'City Hall'];
 function hallName() { return HALL_NAMES[(state.town.tier || 1) - 1]; }
-const BUILDING_NAMES = { hut: 'Hall', longhouse: 'Longhouse', market: 'Market', garden: 'Farm', well: 'Well', smithy: 'Smithy', huntersLodge: 'Hunters’ lodge', jeweler: 'Jeweler', lumberMill: 'Lumber mill', mine: 'Mine', caravanPost: 'Caravan post', fishingHut: 'Fishing hut', warehouse: 'Warehouse', barracks: 'Barracks', beacon: 'Wayfarer’s Beacon' };
+const BUILDING_NAMES = { hut: 'Hall', longhouse: 'Longhouse', market: 'Market', garden: 'Farm', well: 'Well', smithy: 'Smithy', huntersLodge: 'Hunters’ lodge', jeweler: 'Jeweler', lumberMill: 'Lumber mill', mine: 'Mine', caravanPost: 'Caravan post', fishingHut: 'Fishing hut', warehouse: 'Warehouse', barracks: 'Barracks', walls: 'Walls', beacon: 'Wayfarer’s Beacon' };
 function buildingName(key) { return key === 'hut' ? hallName() : BUILDING_NAMES[key]; }
 const UPGRADE_KEYS = ['hut', 'market', 'garden', 'well', 'smithy', 'huntersLodge', 'jeweler', 'lumberMill', 'mine', 'caravanPost', 'fishingHut', 'warehouse', 'barracks'];
 const JOB_KEYS = UPGRADE_KEYS.filter(k => k !== 'hut' && k !== 'well');   // the hall and the well need nobody
@@ -115,7 +116,7 @@ function migrateBuildings(savedBuilt) {
 function housingCap() { return state.built.longhouse ? [12, 24, 36][(state.town.tier || 1) - 1] : 2; }
 // Every working building needs its own citizen; upgrades need one more per building for each tier.
 function staffedBuildings() { return JOB_KEYS.filter(k => state.built[k]).length; }
-function canStaffNew(key) { return key === 'hut' || key === 'longhouse' || key === 'beacon' || key === 'well' || state.town.people > staffedBuildings(); }
+function canStaffNew(key) { return key === 'hut' || key === 'longhouse' || key === 'beacon' || key === 'well' || key === 'walls' || state.town.people > staffedBuildings(); }
 function staffNeeded(tier = state.town.tier || 1) { return tier * staffedBuildings(); }
 function canStaffUpgrade(tier = state.town.tier || 1) { return state.town.people >= staffNeeded(tier); }
 function staffNote(tier = state.town.tier || 1) { return tier + ' citizen' + (tier === 1 ? '' : 's') + ' per building × ' + staffedBuildings() + ' building' + (staffedBuildings() === 1 ? '' : 's') + ' = ' + staffNeeded(tier) + ' needed, ' + state.town.people + ' live here'; }
@@ -144,7 +145,7 @@ function growPopulation() {
 function capacity(key) {
   if (!state.built[key]) return 0;
   if (key === 'barracks') return Infinity;
-  if (key === 'hut' || key === 'longhouse' || key === 'beacon' || key === 'well') return 0;
+  if (key === 'hut' || key === 'longhouse' || key === 'beacon' || key === 'well' || key === 'walls') return 0;
   return (PRODUCERS.has(key) ? 2 : 1) * (state.town.tier || 1);
 }
 // ---------------------------------------------------------------- supplies: every kind of goods has a limit the warehouse raises
@@ -613,6 +614,7 @@ const SERVICES = {
   well: k => wellDialog(k),
   smithy: k => smithyDialog(k),
   barracks: k => barracksDialog(k),
+  walls: k => wallsDialog(k),
   beacon: () => beaconDialog()
 };
 
