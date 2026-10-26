@@ -76,7 +76,7 @@ function abandonQuest(id) {
   const s = townById(id), r = relOf(id);
   if (!s || !r.quest) return;
   r.quest = null; say('You drop the job for ' + s.name + '.');
-  if (dialogIsOpen()) { if (document.getElementById('dialog').textContent.includes('They think of you as')) npcHallDialog(s); else journal(); }
+  if (dialogIsOpen()) { if (menuTab === 'journal') menuRefresh('journal'); else if (document.getElementById('dialog').textContent.includes('They think of you as')) npcHallDialog(s); else journal(); }
 }
 // Every enemy you or your soldiers defeat counts towards the hunting jobs you have taken.
 function huntKill() {
@@ -107,6 +107,7 @@ function signDeal(id) {
   if (state.coin < fee) { say('The deal costs ' + fee + ' coin to seal.', 'alert'); npcHallDialog(s); return; }
   state.coin -= fee;
   state.deals[id] = { sell: null, buy: null, gear: false, last: state.day, since: state.day, trips: 0, profit: 0 };
+  logWorld('Brackenford and ' + s.name + ' sealed a trade deal.', 'gold', s.id);
   say('You and ' + s.name + ' seal a trade deal: you are allies. Set what the caravans carry at your caravan post.', 'gold');
   for (const t of newEnemiesIfAllied(s)) makeHostile(t, id);
   render(); npcHallDialog(s);
@@ -116,6 +117,7 @@ function breakAlliance(id, why) {
   if (!s || !isAlly(id)) return;
   delete state.deals[id]; delete state.aid[id];
   relOf(id).favor = 0;
+  logWorld(why || 'You ended your alliance with ' + s.name + '.', 'alert', s.id);
   say(why || 'You end your alliance with ' + s.name + '.', 'alert');
   reconcileHostility();
   render(); if (dialogIsOpen()) caravanDialog('caravanPost');
@@ -237,7 +239,9 @@ function npcHallDialog(s) {
 }
 
 // ---------------------------------------------------------------- the journal
-function journal() {
+// The journal tab of the menu: your jobs, allies, enemies and the wars going on, and how your own settlement stands.
+function journal() { openMenu('journal'); }
+function journalHtml() {
   ensureWarWorld();
   const jobs = Object.entries(state.rel || {}).filter(([, r]) => r.quest).map(([id, r]) => {
     const s = townById(id), q = r.quest;
@@ -246,5 +250,7 @@ function journal() {
   const ally = allies().map(s => '<div class="up-row"><span>' + swatch(s.id) + esc(s.name) + '<br><em>' + (state.deals[s.id].trips) + ' caravan trips</em></span></div>').join('') || '<p>No allies yet.</p>';
   const foes = Object.keys(state.hostile || {}).map(id => { const s = townById(id); return s ? '<div class="up-row"><span>' + swatch(id) + esc(s.name) + '<br><em>at war with you since day ' + state.hostile[id].since + '</em></span></div>' : ''; }).join('') || '<p>Nobody is at war with you.</p>';
   const calls = aidRows();
-  showDialog('<h2>Journal</h2><h3>Jobs</h3>' + jobs + '<h3>Allies</h3>' + ally + (calls ? '<h3>Allies asking for help</h3>' + calls : '') + '<h3>Enemies</h3>' + foes + '<h3>Wars between settlements</h3>' + npcWarRows() + '<button onclick="closeDialog()">Close</button>');
+  if (!npcVisit()) renderTown();
+  const report = !npcVisit() ? '<h3>' + esc(settleName()) + '</h3><div class="town-metrics">' + document.getElementById('town-stats').innerHTML + '</div>' : '';
+  return (report + '<h3>Jobs</h3>' + jobs + '<h3>Allies</h3>' + ally + (calls ? '<h3>Allies asking for help</h3>' + calls : '') + '<h3>Enemies</h3>' + foes + '<h3>Wars between settlements</h3>' + npcWarRows());
 }

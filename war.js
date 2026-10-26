@@ -212,6 +212,7 @@ function declareWar(id) {
   const r = relOf(id); r.quest = null; r.favor = 0;
   if (state.zone === 'town' && state.visiting === id) exitTown();                     // its gates close behind you
   const helped = siegeHelp(s);
+  logWorld('You declared war on ' + s.name + '.', 'alert', s.id);
   say('You declare war on ' + s.name + '! Its ' + g + ' defenders take up arms and ' + h + ' houses around the town are fortified. Defeat every defender and tear every building down, then walk in to claim it.' + (helped ? ' Allied soldiers have already cut down ' + helped + ' of them.' : ''), 'alert');
   render();
   return true;
@@ -251,6 +252,7 @@ function sueForPeace(id) {
   for (const [x, y] of warFoes(id)) { removeEnemyData(overworld, x, y); overworld[y][x] = '.'; }
   delete state.wars[id]; if (state.hostile[id]) { state.hostile[id].war = false; reconcileHostility(); }
   s.aggression = Math.min(MAX_AGGRESSION, +(s.aggression + .15).toFixed(2));
+  logWorld('You made peace with ' + s.name + '.', '', s.id);
   say(s.name + ' accepts your tribute of ' + cost + ' coin and lays down arms. They will remember it.', 'gold');
   render(); if (dialogIsOpen()) closeDialog();
 }
@@ -267,6 +269,7 @@ function annex(id) {
   s.owner = 'player'; s.people = 2; s.cap = Math.max(s.cap || 3, 3); s.wreck = 0; s.stock = {};
   state.coin += loot;
   if (typeof makeColony === 'function') makeColony(s);
+  logWorld(s.name + ' is annexed by Brackenford.', 'gold', s.id);
   say(s.name + ' is yours: ' + loot + ' coin in plunder, and two survivors who will take your orders. It has no buildings left, so raise them as you would in Brackenford. Its workers now wear Brackenford’s colour.' + (freed.length ? ' ' + freed.map(t => t.name).join(' and ') + ', which it ruled, ' + (freed.length === 1 ? 'is' : 'are') + ' free again.' : ''), 'gold');
   render();
 }
@@ -339,6 +342,7 @@ function startRaid(s, opts = {}) {
   if (!placed) return false;
   state.raid = { from: s.id, name: s.name, left: placed, total: placed, deadline: state.day + 2, looted: 0, killed: 0, war };
   say(war ? 'A warband from ' + s.name + ' (' + placed + ' of them) is marching on Brackenford from the ' + dir + '! Stop them before they reach the town, or they will kill your citizens and burn your buildings.' : 'Raiders from ' + s.name + ' (' + placed + ' of them) are marching on Brackenford from the ' + dir + '! Defend the settlement before they reach it, or they will ransack the pantry.', 'alert');
+  logWorld((war ? 'A warband from ' : 'Raiders from ') + s.name + ' march on Brackenford.', 'alert', s.id);
   alliesHelp();
   return true;
 }
@@ -414,6 +418,7 @@ function endRaid() {
     if (s && !r.war) s.aggression = +(s.aggression * .6).toFixed(2);
     say('The ' + (r.war ? 'assault' : 'raid') + ' from ' + r.name + ' is broken! ' + (r.war ? 'The settlement pays you ' + reward + ' coin from the plunder you take from the raiders.' : 'The town pays you ' + reward + ' coin in thanks, and the raiders will think twice before coming back.'), 'gold');
   } else say('The ' + (r.war ? 'assault' : 'raid') + ' from ' + r.name + ' is over: ' + r.looted + ' raider' + (r.looted === 1 ? '' : 's') + ' got through.', 'alert');
+  logWorld(r.looted === 0 ? 'The ' + (r.war ? 'assault' : 'raid') + ' from ' + r.name + ' was broken at Brackenford.' : 'The ' + (r.war ? 'assault' : 'raid') + ' from ' + r.name + ' got ' + r.looted + ' raider' + (r.looted === 1 ? '' : 's') + ' into Brackenford.', r.looted === 0 ? 'gold' : 'alert', r.from);
   render();
 }
 // Raiders still out when the deadline comes reach the town; each soldier on duty stops one of them at the gate.
@@ -455,7 +460,7 @@ function startNpcWar(a, d) {
   const w = { id: state.npcWarSeq, a: a.id, d: d.id, since: state.day, aid: 0, you: null, aSize: a.people, dSize: d.people };
   state.npcWars.push(w);
   const known = a.discovered || d.discovered || isAlly(a.id) || isAlly(d.id);
-  if (known) say('War! ' + a.name + ' has marched on ' + d.name + '.', isAlly(d.id) ? 'alert' : '');
+  if (known) { say('War! ' + a.name + ' has marched on ' + d.name + '.', isAlly(d.id) ? 'alert' : ''); logWorld('War: ' + a.name + ' has marched on ' + d.name + '.', 'alert', a.id); }
   if (isAlly(d.id)) callForAid(d, a);
   return w;
 }
@@ -470,6 +475,7 @@ function annexByNpc(win, lose) {
 function stockOf(s) { return s.stock || (s.stock = {}); }
 // A settlement that falls respawns with two citizens and none of its buildings; they come back one by one.
 function respawnSettlement(s) {
+  s.walls = false; s.wallPct = null; wallCache = null; s.rank = 0;
   s.people = 2; s.stock = {}; s.wreck = 0; s.aggression = +clamp((s.aggression || 0) * .5, 0, MAX_AGGRESSION).toFixed(2);
   s.wreck = Object.keys(buildNpcTown(s).plots).length;
 }
@@ -481,12 +487,13 @@ function endNpcWar(w, winnerId, how) {
   if (!win || !lose) return;
   const loot = { ...stockOf(lose) }, parts = [];
   const known = win.discovered || lose.discovered || isAlly(win.id) || isAlly(lose.id) || w.you;
-  if (how === 'draw') { if (known) say('The war between ' + win.name + ' and ' + lose.name + ' fizzles out; both sides are bled and neither is beaten.'); return; }
+  if (how === 'draw') { if (known) { say('The war between ' + win.name + ' and ' + lose.name + ' fizzles out; both sides are bled and neither is beaten.'); logWorld('The war between ' + win.name + ' and ' + lose.name + ' fizzled out.', '', win.id); } return; }
   for (const [k, n] of Object.entries(loot)) { stockOf(win)[k] = Math.min(60, (stockOf(win)[k] || 0) + n); if (n) parts.push(n + ' ' + itemNames[k].toLowerCase()); }
   respawnSettlement(lose);
   win.people = Math.max(win.people, Math.min((win.cap || 8) + 3, win.people + 1));      // victors take in a few of the vanquished, but never shrink
   const annexed = !win.owner && !lose.owner && subjectsOf(win.id).length < MAX_SUBJECTS;
   if (annexed) annexByNpc(win, lose);
+  if (known) logWorld(win.name + ' has won the war against ' + lose.name + (annexed ? ' and annexed it' : ' and left it in ruins') + '.', 'gold', win.id);
   if (known) say(win.name + ' has won the war against ' + lose.name + (parts.length ? ' and carries off ' + parts.join(', ') : '') + '. ' + (annexed ? lose.name + ' is annexed and ruled by ' + win.name + ' now; two survivors start again among the ruins.' : lose.name + ' is left in ruins; two survivors start again.'), isAlly(lose.id) ? 'alert' : 'gold');
   if (w.you) {
     const mine = (w.you === 'a') === (winnerId === w.a);
@@ -573,6 +580,7 @@ function npcWarRows() {
 function callForAid(ally, attacker) {
   if (!isAlly(ally.id) || state.aid[ally.id]) return;
   state.aid[ally.id] = { against: attacker.id, deadline: state.day + 3, helped: false };
+  logWorld(attacker.name + ' declared war on your ally ' + ally.name + '.', 'alert', ally.id);
   say(ally.name + ' calls on you: ' + attacker.name + ' has declared war on them. Send help within 3 days, with supplies or by fighting, or the alliance ends.', 'alert');
 }
 function aidCost(ally) { return 15 + 5 * townBracket(ally.people); }
@@ -621,7 +629,7 @@ function worldTurn() {
     if (!s.owner || s.owner === 'player') continue;
     const o = townById(s.owner);
     if (!o) { s.owner = null; continue; }
-    if (s.people >= 4 && Math.random() < 0.015) { s.owner = null; if (s.discovered || o.discovered) say(s.name + ' throws off ' + o.name + '’s rule and is independent again.'); }
+    if (s.people >= 4 && Math.random() < 0.015) { s.owner = null; if (s.discovered || o.discovered) { say(s.name + ' throws off ' + o.name + '’s rule and is independent again.'); logWorld(s.name + ' threw off ' + o.name + '’s rule and is independent again.', '', s.id); } }
   }
   raidDeadline(); hostilityTurn(); aidTurn(); npcWarTurn();
   if (state.day <= 6) return;

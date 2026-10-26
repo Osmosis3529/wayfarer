@@ -431,19 +431,22 @@ test('holding the on-screen pad walks, and the buttons act', () => phone(async p
   assert.ok(r.walked >= 3, 'walked ' + r.walked); assert.equal(r.stopped, true); assert.ok(r.hp > 1); assert.equal(r.facing, -1);
 }));
 
-test('the menu drawer opens, pauses the world, and holds the side panels', () => phone(async page => {
+test('the menu button opens the pop-up menu, which pauses the world, and the header buttons live in its settings tab', () => phone(async page => {
   const r = await page.evaluate(async () => {
-    manualPause = false; await new Promise(r => setTimeout(r, 300)); const closed = document.getElementById('log').getBoundingClientRect().left >= innerWidth - 1;
-    document.getElementById('t-menu').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
-    await new Promise(r => setTimeout(r, 400));
-    const open = document.getElementById('log').getBoundingClientRect().left < innerWidth - 100;
+    manualPause = false; await new Promise(r => setTimeout(r, 300));
+    const press = () => document.getElementById('t-menu').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
+    const hidden = [...document.querySelectorAll('.stats .save-btn')].every(b => getComputedStyle(b).display === 'none'), side = getComputedStyle(document.querySelector('.side')).display;
+    press(); await new Promise(r => setTimeout(r, 300));
+    const open = document.getElementById('overlay').style.display === 'grid', tabs = [...document.querySelectorAll('#dialog .tabs button')].map(b => b.textContent);
     const c0 = state.clock; await new Promise(r => setTimeout(r, 600)); const frozen = state.clock === c0;
-    const tools = [...document.querySelectorAll('#drawer-tools button')].map(b => b.textContent);
-    document.getElementById('drawer-close').click(); await new Promise(r => setTimeout(r, 300));
+    openMenu('settings'); const tools = [...document.querySelectorAll('#dialog button')].map(b => b.textContent);
+    press(); await new Promise(r => setTimeout(r, 300)); const closed = document.getElementById('overlay').style.display === 'none';
     const c1 = state.clock; await new Promise(r => setTimeout(r, 600));
-    return { closed, open, frozen, tools: tools.length, resumed: state.clock > c1 };
+    return { hidden, side, open, tabs, frozen, tools, closed, resumed: state.clock > c1, drawer: !!document.getElementById('drawer-close') };
   });
-  assert.deepEqual(r, { closed: true, open: true, frozen: true, tools: r.tools, resumed: true }); assert.ok(r.tools >= 4);
+  assert.equal(r.hidden, true); assert.equal(r.side, 'none'); assert.equal(r.open, true); assert.deepEqual(r.tabs, ['Stats', 'Inventory', 'Map', 'Journal', 'World logs', 'Settings']); assert.equal(r.frozen, true);
+  assert.ok(['Save world', 'Export save'].every(t => r.tools.includes(t)) && r.tools.some(t => t.startsWith('Graphics:')) && r.tools.some(t => t.startsWith('Art:')), r.tools.join());
+  assert.equal(r.closed, true); assert.equal(r.resumed, true); assert.equal(r.drawer, false);
 }));
 
 test('held upright the map shows a tall slice, the pad sits below it, and turning the phone switches views', () => phone(async page => {

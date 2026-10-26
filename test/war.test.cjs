@@ -205,7 +205,7 @@ test('a siege: every defender and building must fall, the gates stay shut until 
     const spots = houses.map(h => h.k).sort().join(); state.x = HOME.x + 10; state.y = HOME.y;
     for (let i = 0; i < 8; i++) moveEnemies(); const still = foeBox().filter(f => f.e.building).map(f => f.k).sort().join() === spots;
     // a house is fought by walking into it, in the ordinary battle
-    const taken = new Set(foes.map(f => f.k)); let pick = null;       // an approach tile with no other foe beside it, so only the house is in play
+    const taken = new Set(foeBox().map(f => f.k)); let pick = null;       // an approach tile with no other foe beside it (the guards have moved since they were placed), so only the house is in play
     for (const h of houses) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
       const sx = h.x + dx, sy = h.y + dy;
       if (pick || taken.has(sx + ',' + sy)) continue;

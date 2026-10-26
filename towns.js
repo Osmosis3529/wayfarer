@@ -401,8 +401,9 @@ function drawWorldMap(cv) {
   const here = state.zone === 'town' ? hereSettlement() : { x: state.x, y: state.y };
   if (here) { ctx.fillStyle = '#ffffff'; ctx.fillRect(here.x * S - 1, here.y * S - 1, 5, 5); ctx.fillStyle = '#14181a'; ctx.fillRect(here.x * S, here.y * S, 3, 3); }
 }
-function openMap() {
-  if (state.combat || !['overworld', 'town'].includes(state.zone)) return;
+// The map tab of the menu: the world, with every settlement and a ride to those you have visited.
+function mapHtml() {
+  if (!['overworld', 'town'].includes(state.zone)) return '<h3>World map</h3><p>The map cannot be read underground. Come back out into the open.</p>';
   ensureWarWorld();
   const here = hereSettlement();
   const rows = settlementList().map(s => {
@@ -414,9 +415,11 @@ function openMap() {
     const action = here && s.id === here.id ? '<em>you are here</em>' : '<button ' + (block ? 'disabled' : '') + ' onclick="travelTo(\'' + s.id + '\')">Ride' + (here ? ' · ' + cost + ' coin' : '') + '</button>';
     return '<div class="up-row"><span>' + swatch(s.id) + esc(s.name) + '<br><em>' + esc(bits.filter(Boolean).join(' · ')) + (block && here && s.id !== here.id ? ' · ' + esc(block) : '') + '</em></span><span>' + action + '</span></div>';
   }).join('');
-  showDialog('<h2>World map</h2><canvas id="worldmap" width="' + WORLD_W * 3 + '" height="' + WORLD_H * 3 + '" style="width:100%;image-rendering:pixelated;border:1px solid #2e4034"></canvas>' +
+  return ('<h3>World map</h3><canvas id="worldmap" width="' + WORLD_W * 3 + '" height="' + WORLD_H * 3 + '" style="width:100%;image-rendering:pixelated;border:1px solid #2e4034"></canvas>' +
     '<p>Filled squares are settlements you have visited, outlines ones you have only seen; tan lines are roads you have ridden. The white dot is you.</p>' +
-    '<p>' + (here ? 'You are in ' + esc(here.name) + '. Ride to any settlement you have visited; farther costs more.' : 'Fast travel is arranged from inside a settlement: walk into one to ride to another.') + '</p>' + rows +
-    '<button onclick="closeDialog()">Close</button>');
-  drawWorldMap(document.getElementById('worldmap'));
+    '<p>' + (here ? 'You are in ' + esc(here.name) + '. Ride to any settlement you have visited; farther costs more.' : 'Fast travel is arranged from inside a settlement: walk into one to ride to another.') + '</p>' + rows);
+}
+function openMap() {
+  if (state.combat || !['overworld', 'town'].includes(state.zone)) return;
+  openMenu('map');
 }
