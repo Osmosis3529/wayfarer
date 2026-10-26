@@ -37,6 +37,7 @@
       "gfx.js",
       "stats.js",
       "settlement.js",
+      "economy.js",
       "war.js",
       "dark.js",
       "towns.js",

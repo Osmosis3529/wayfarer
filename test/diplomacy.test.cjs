@@ -168,11 +168,11 @@ test('the caravan post shows the deals and lets you change what the caravans car
     state.x = HOME.x + 2; state.y = HOME.y; interact(); const text = dialogText();
     const click = label => [...document.querySelectorAll('#dialog button')].find(b => b.textContent.startsWith(label)).click();
     click('Sell:'); const sell1 = state.deals[a.id].sell; click('Buy:'); const buy1 = state.deals[a.id].buy; click('Equipment:'); const gear = state.deals[a.id].gear;
-    for (let i = 0; i < 12; i++) click('Sell:'); const cycled = state.deals[a.id].sell;
-    click('End the deal'); return { text, sell1, buy1, gear, cycled, ally: isAlly(a.id), after: dialogText() };
+    for (let i = 0; i < 12; i++) click('Sell:'); const cycled = state.deals[a.id].sell, expected = [null, ...TRADE_GOODS][13 % (TRADE_GOODS.length + 1)];
+    click('End the deal'); return { text, sell1, buy1, gear, cycled, expected, ally: isAlly(a.id), after: dialogText() };
   });
   assert.ok(r.text.includes('Caravan post') && r.text.includes('Sell: nothing') && r.text.includes('Equipment: no'), r.text);
-  assert.equal(r.sell1, 'berries'); assert.equal(r.buy1, 'berries'); assert.equal(r.gear, true); assert.equal(r.cycled, 'stone');   // 13 clicks round nothing + 9 goods: the fourth entry
+  assert.equal(r.sell1, 'berries'); assert.equal(r.buy1, 'berries'); assert.equal(r.gear, true); assert.equal(r.cycled, r.expected); assert.equal(r.cycled, 'wood');   // 13 clicks round nothing + 10 goods: the third entry
   assert.equal(r.ally, false); assert.ok(r.after.includes('No deals yet'), r.after);
 }));
 

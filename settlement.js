@@ -148,7 +148,7 @@ function capacity(key) {
   return (PRODUCERS.has(key) ? 2 : 1) * (state.town.tier || 1);
 }
 // ---------------------------------------------------------------- supplies: every kind of goods has a limit the warehouse raises
-const CAPPED = ['wood', 'stone', 'berries', 'copper', 'iron', 'silver', 'gold', 'furs', 'gems', 'torch'];
+const CAPPED = ['wood', 'stone', 'coal', 'berries', 'copper', 'iron', 'silver', 'gold', 'furs', 'gems', 'torch'];
 const BASE_SUPPLY = 50, WAREHOUSE_SUPPLY = 100;
 // The limit for each kind of goods and for the pantry: 50, plus 100 while someone keeps the warehouse, plus 100 for each warehouse upgrade.
 function warehouseBonus(r) { return r.built && r.built.warehouse && ((r.assign && r.assign.warehouse) || 0) > 0 ? WAREHOUSE_SUPPLY * (1 + ((r.up && r.up.warehouse) || []).filter(Boolean).length) : 0; }
@@ -497,11 +497,11 @@ function shopPrice(key, item, side) {
   if (spec.includes(item)) p = side === 'buy' ? Math.max(1, Math.round(base * .85)) : Math.round(base * 1.2);
   return Math.max(1, p);
 }
-const SHOP_SPECIALTY = { lumberMill: ['wood', 'torch'], mine: ['stone', 'copper', 'iron'], garden: ['berries'], huntersLodge: ['furs'], jeweler: ['gems', 'silver', 'gold'] };
+const SHOP_SPECIALTY = { lumberMill: ['wood', 'torch'], mine: ['stone', 'coal', 'copper', 'iron'], garden: ['berries'], huntersLodge: ['furs'], jeweler: ['gems', 'silver', 'gold'] };
 const SHOP_GOODS = {
-  market: { buy: ['berries', 'wood', 'stone', 'copper', 'iron', 'silver', 'gold', 'furs', 'gems', 'torch'], sell: ['berries', 'wood', 'stone', 'copper', 'iron', 'silver', 'gold', 'furs', 'gems', 'torch', 'relic'] },
+  market: { buy: ['berries', 'wood', 'stone', 'coal', 'copper', 'iron', 'silver', 'gold', 'furs', 'gems', 'torch'], sell: ['berries', 'wood', 'stone', 'coal', 'copper', 'iron', 'silver', 'gold', 'furs', 'gems', 'torch', 'relic'] },
   lumberMill: { buy: ['wood', 'torch'], sell: ['wood', 'torch'] },
-  mine: { buy: ['stone', 'copper', 'iron'], sell: ['stone', 'copper', 'iron'] },
+  mine: { buy: ['stone', 'coal', 'copper', 'iron'], sell: ['stone', 'coal', 'copper', 'iron'] },
   garden: { buy: ['berries'], sell: ['berries'] },
   huntersLodge: { buy: ['furs'], sell: ['furs'] },
   jeweler: { buy: ['gems', 'silver', 'gold'], sell: ['gems', 'silver', 'gold', 'relic'] }
@@ -643,7 +643,7 @@ function townMove(dx, dy) {
 function dailyOutput(key, perWorker) {
   const n = crew(key);
   if (!n) return 0;
-  const v = Math.max(1, Math.round(n * perWorker * upMult(key)));
+  const v = Math.max(1, Math.round(n * perWorker * upMult(key) * fuelFactor(key)));
   return state.starving ? Math.max(1, Math.round(v * .25)) : v;
 }
 
@@ -658,6 +658,7 @@ function renderTown() {
     '<div class="town-metric">Citizens<b>' + state.town.people + ' / ' + housingCap() + '</b></div>' +
     '<div class="town-metric">Employed<b>' + employed() + ' · ' + unassigned() + ' without work</b></div>' +
     '<div class="town-metric">Pantry<b>' + state.town.food + ' meals' + (state.starving ? ' · starving' : '') + '</b></div>' +
+    (fuelNote() ? '<div class="town-metric">Fuel<b>' + fuelNote().replace('Coal: ', '') + '</b></div>' : '') +
     '<div class="town-metric">Storage<b>' + supplyCap() + ' per supply' + (crew('warehouse') ? '' : ' · no warehouse keeper') + '</b></div>' +
     '<div class="town-metric">Growth<b>' + esc(growthLabel()) + '</b></div>' +
     '<div class="town-metric">Projects<b>' + built + ' / ' + Object.keys(state.built).length + ' built</b></div>' +

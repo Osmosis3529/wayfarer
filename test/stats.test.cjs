@@ -178,7 +178,7 @@ test('quests pay more and win more trust from a charming traveler', () => game(a
 
 test('the blacksmith’s upgrades teach better tiers; the forge sells every slot', () => game(async page => {
   const r = await page.evaluate(() => {
-    const out = {}; state.built.smithy = true; state.inv.copper = 20; state.inv.iron = 20; state.inv.wood = 20; state.inv.furs = 20; state.inv.silver = 20; state.inv.gold = 20; state.inv.gems = 20;
+    const out = {}; state.built.smithy = true; state.inv.coal = 20; state.inv.copper = 20; state.inv.iron = 20; state.inv.wood = 20; state.inv.furs = 20; state.inv.silver = 20; state.inv.gold = 20; state.inv.gems = 20;
     out.levels = [smithyLevel()]; openSmithy(); out.text0 = dialogText();
     state.up.smithy = [true, false, false]; out.levels.push(smithyLevel()); openSmithy(); out.text1 = dialogText();
     state.up.smithy = [true, true, true]; out.levels.push(smithyLevel()); openSmithy(); out.text3 = dialogText();
@@ -194,7 +194,7 @@ test('the blacksmith’s upgrades teach better tiers; the forge sells every slot
   assert.ok(r.text1.includes('Iron longsword') && !r.text1.includes('Steel saber'), r.text1);
   assert.ok(r.text3.includes('Moonsteel blade') && r.text3.includes('Gem-set plate') && r.text3.includes('Gem-set circlet') && !r.text3.includes('Bronze knife'), r.text3);
   assert.deepEqual(r.moonsteel, ['Moonsteel blade', 18, 18, 18]); assert.equal(r.cap, 'Leather cap'); assert.equal(r.tooFine, 'Moonsteel blade');
-  assert.deepEqual(r.recipes[0], { copper: 2, wood: 1 }); assert.ok(r.recipes[1].iron >= 3 && r.recipes[2].gems >= 1);
+  assert.deepEqual(r.recipes[0], { copper: 2, wood: 1, coal: 1 }); assert.ok(r.recipes[1].iron >= 3 && r.recipes[2].gems >= 1);
 }));
 
 test('chests and fallen foes give gear for every slot, better the deeper and farther you go', () => game(async page => {

@@ -445,28 +445,29 @@ test('the hunting camp is gone, the gem hall is the jeweler, and the warehouse i
   assert.deepEqual(r.titles, ['Jeweler', 'Warehouse keeper']); assert.deepEqual(r.names, ['Jeweler', 'Warehouse']);
 }));
 
-test('the mine brings copper, iron and stone; the jeweler brings silver, gold and gems; the lodge brings meals and furs', () => game(async page => {
+test('the mine brings coal, copper, iron and stone; the jeweler brings silver, gold and gems; the lodge brings meals and furs', () => game(async page => {
   const r = await page.evaluate(() => {
     RICH(); build('mine'); build('jeweler'); build('huntersLodge'); state.town.people = 40; state.town.food = 40;
     const seen = { mine: new Set(), jeweler: new Set() }, before = () => ({ ...state.inv });
     state.assign.mine = 2; state.assign.jeweler = 2; state.assign.huntersLodge = 2;
     for (let i = 0; i < 40; i++) {
       for (const k of Object.keys(state.inv)) state.inv[k] = 0;
+      state.inv.coal = 3;                                      // one for each furnace, so nothing runs cold
       state.town.food = 40; const food = state.town.food;
       advanceDay();
-      for (const k of ['copper', 'iron', 'stone']) if (state.inv[k]) seen.mine.add(k);
+      for (const k of ['coal', 'copper', 'iron', 'stone']) if (state.inv[k]) seen.mine.add(k);
       for (const k of ['silver', 'gold', 'gems']) if (state.inv[k]) seen.jeweler.add(k);
       var other = state.inv.wood + state.inv.berries; var lodge = [state.inv.furs, state.town.food - food + state.town.people];
     }
     return { mine: [...seen.mine].sort(), jeweler: [...seen.jeweler].sort(), other, lodge };
   });
-  assert.deepEqual(r.mine, ['copper', 'iron', 'stone']); assert.deepEqual(r.jeweler, ['gems', 'gold', 'silver']); assert.equal(r.other, 0);
+  assert.deepEqual(r.mine, ['coal', 'copper', 'iron', 'stone']); assert.deepEqual(r.jeweler, ['gems', 'gold', 'silver']); assert.equal(r.other, 0);
   assert.equal(r.lodge[0], 2);                                   // two hunters, one fur each
 }));
 
 test('the lodge pays 2 meals and a fur per hunter, starving cuts it, and nobody means nothing', () => game(async page => {
   const r = await page.evaluate(() => {
-    RICH(); build('huntersLodge'); state.town.people = 20; for (const k of Object.keys(state.inv)) state.inv[k] = 0;
+    RICH(); build('huntersLodge'); state.town.people = 20; for (const k of Object.keys(state.inv)) state.inv[k] = 0; state.inv.coal = 50;
     const day = () => { state.town.food = 20; state.inv.furs = 0; advanceDay(); return [state.town.food - 20 + state.town.people, state.inv.furs]; };
     state.assign.huntersLodge = 3; const plain = day();
     state.up.huntersLodge = [true, false, false]; const up = day();

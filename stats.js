@@ -287,7 +287,8 @@ function findGear(source) {
 const TIER_PRICE = [24, 50, 90, 150, 240];
 const SLOT_PRICE = { weapon: 1, helmet: .6, armor: 1.3, leggings: .8 };
 function basePrice(tier, slot) { return Math.round(TIER_PRICE[tier - 1] * SLOT_PRICE[slot]); }
-const TIER_MATS = [{ copper: 2, wood: 1 }, { copper: 3, furs: 1, wood: 1 }, { iron: 3, furs: 1 }, { iron: 4, silver: 2 }, { gold: 2, gems: 2, silver: 2 }];
+// Every piece also burns coal at the forge.
+const TIER_MATS = [{ copper: 2, wood: 1, coal: 1 }, { copper: 3, furs: 1, wood: 1, coal: 1 }, { iron: 3, furs: 1, coal: 2 }, { iron: 4, silver: 2, coal: 2 }, { gold: 2, gems: 2, silver: 2, coal: 3 }];
 function recipeFor(g) {
   const out = {};
   for (const [k, v] of Object.entries(TIER_MATS[g.tier - 1])) out[k] = Math.max(1, Math.round(v * ({ weapon: 1, helmet: .6, armor: 1.4, leggings: .9 }[g.slot])));

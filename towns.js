@@ -39,7 +39,7 @@ const NPC_KIND_NAMES = { market: 'Market', inn: 'Inn', travel: 'Caravan post', h
 const NPC_EXTRAS = [['well', 0], ['huntersLodge', 1], ['smithy', 2], ['jeweler', 3], ['mine', 3]];
 const NPC_SHOPS = {
   huntersLodge: { buy: ['furs', 'berries'], sell: ['furs', 'berries'] },
-  mine: { buy: ['stone', 'copper', 'iron'], sell: ['stone', 'copper', 'iron'] },
+  mine: { buy: ['stone', 'coal', 'copper', 'iron'], sell: ['stone', 'coal', 'copper', 'iron'] },
   jeweler: { buy: ['gems', 'silver', 'gold'], sell: ['gems', 'silver', 'gold', 'relic'] }
 };
 
