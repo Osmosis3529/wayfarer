@@ -96,3 +96,90 @@ function npcWallsDay(s) {
   }
   if (s.walls && s.wallPct != null && s.wallPct < 1) { s.wallPct = Math.min(1, +(s.wallPct + .1).toFixed(3)); wallCache = null; }
 }
+
+// ---------------------------------------------------------------- what a surplus invites
+// Full stores are a temptation: every kind of goods piled up near the limit, and every store of surplus kept in the
+// settlements you annexed, makes raiders and monsters more likely to come (up to two and a half times as likely).
+function surplusKinds() {
+  const cap = supplyCap(), full = k => (state.inv[k] || 0) >= cap * .9;
+  return CAPPED.filter(k => k !== 'torch' && full(k)).length + ((state.town.food || 0) >= cap * .9 ? 1 : 0);
+}
+function stockTotal() {
+  let n = 0;
+  for (const s of settlements) if (s.owner === 'player') n += Object.values(s.stock || {}).reduce((a, b) => a + b, 0);
+  return n;
+}
+function raidAttraction() { return Math.min(2.5, 1 + .2 * surplusKinds() + .1 * Math.floor(stockTotal() / 20)); }
+
+// ---------------------------------------------------------------- monster raids
+// Now and then a pack of wild monsters comes out of the wilds for a settlement. Brackenford's fight is on the map like any
+// raid; the other settlements' are settled at once, and their walls make the difference.
+const MONSTER_RAID_RATE = .035;
+function monsterPack(n) {
+  const foes = [];
+  for (let i = 0; i < n - 1; i++) foes.push({ ...chooseEnemy('overworld'), faction: 'raid', raid: true, monster: true, townId: null });
+  foes.push({ ...enemyCatalog[state.day >= 50 ? 'troll' : state.day >= 20 ? 'dire' : 'stalker'], faction: 'raid', raid: true, monster: true, townId: null, bonus: 1 });
+  return foes;
+}
+function startMonsterRaid() {
+  if (state.raid) return false;
+  const n = clamp(2 + Math.floor(state.day / 15) + Math.floor((raidAttraction() - 1) * 2), 2, 8), foes = monsterPack(n);
+  let placed = 0, dir = '';
+  for (let tries = 0; tries < 24 && !placed; tries++) {
+    const a = Math.random() * Math.PI * 2, c = { x: HOME.x + Math.cos(a) * 19, y: HOME.y + Math.sin(a) * 19 };
+    placed = placeFoes(c, foes, 0, 4);
+    if (placed) dir = compass(Math.round(c.x - HOME.x), Math.round(c.y - HOME.y));
+  }
+  if (!placed) return false;
+  state.raid = { from: null, name: 'the wilds', monster: true, left: placed, total: placed, deadline: state.day + 2, looted: 0, killed: 0, war: false };
+  const msg = 'A pack of monsters (' + placed + ' of them) is coming out of the wilds for Brackenford from the ' + dir + '! ' + (wallHolds() ? 'The wall will hold them for a while; ' : '') + 'drive them off before they get in, or they will maul the citizens and eat the pantry.';
+  say(msg, 'alert'); logWorld('Monsters are raiding Brackenford.', 'alert');
+  alliesHelp();
+  return true;
+}
+// A monster that gets inside the settlement: it mauls a citizen now and then and eats from the pantry.
+function monsterStrikes() {
+  const food = Math.min(state.town.food, 2 + Math.floor(state.town.people / 4)), parts = [];
+  state.town.food -= food; parts.push('eats ' + food + ' meals');
+  if (state.town.people > 0 && Math.random() < .5) { loseCitizens(1); parts.push('mauls a citizen'); }
+  say('A monster gets into Brackenford and ' + parts.join(' and ') + '!', 'alert');
+  const r = state.raid;
+  if (r) { r.looted++; r.left--; }
+  if (state.town.people <= 0) { if (state.raid) { state.raid = null; for (const [x, y] of raiderTiles()) { removeEnemyData(overworld, x, y); overworld[y][x] = '.'; } } wipeHome(); return; }
+  if (r && r.left <= 0) endRaid();
+}
+function monsterRaidTurn() {
+  if (state.day < 5) return;
+  const att = raidAttraction();
+  if (!state.raid && (state.built.hut || state.built.longhouse) && state.town.people > 0 && Math.random() < MONSTER_RAID_RATE * att) startMonsterRaid();
+  // one more roll for everybody else: annexed settlements with a store of surplus draw monsters most
+  if (Math.random() < .2) {
+    const pool = settlements.map(s => ({ s, w: s.owner === 'player' ? 1 + Object.values(s.stock || {}).reduce((a, b) => a + b, 0) / 20 : s.owner ? .3 : 1 })), total = pool.reduce((a, p) => a + p.w, 0);
+    let roll = Math.random() * total, pick = pool[pool.length - 1].s;
+    for (const p of pool) { roll -= p.w; if (roll < 0) { pick = p.s; break; } }
+    resolveMonsterRaid(pick);
+  }
+}
+function resolveMonsterRaid(s) {
+  if (warOf(s.id) || (state.wars && state.wars[s.id]) || s.wreck > 0 && s.people < 3) return;
+  const mine = s.owner === 'player', rec = mine ? recordOf(s.id) : null, walled = mine ? !!(rec && rec.built.walls && (rec.wallPct == null ? 1 : rec.wallPct) > 0) : npcWalls(s);
+  if (walled) {
+    const w = wallList().find(x => x.id === s.id);
+    if (mine) wallDamage(w, w.max * .3); else npcWallHit(s, .3);
+    const text = 'Monsters hurl themselves at ' + s.name + '’s wall and are beaten back.';
+    if (mine) say(text, 'gold');
+    logWorld(text, mine ? 'gold' : '', s.id);
+    return;
+  }
+  if (mine) {
+    if (!rec || rec.town.people <= 1) return;
+    rec.town.people--; s.people = rec.town.people;
+    const lost = {}; for (const k of Object.keys(s.stock || {})) { const n = Math.floor(s.stock[k] / 2); if (n) { s.stock[k] -= n; lost[k] = n; } }
+    const text = 'Monsters raid ' + s.name + ': a citizen is killed' + (Object.keys(lost).length ? ' and ' + Object.entries(lost).map(([k, n]) => n + ' ' + itemNames[k].toLowerCase()).join(', ') + ' of its stores are eaten or smashed' : '') + '. A wall would have turned them back.';
+    say(text, 'alert'); logWorld(text, 'alert', s.id); return;
+  }
+  if (s.people <= 3) return;
+  const dead = 1 + (Math.random() < .35 ? 1 : 0);
+  s.people = Math.max(2, s.people - dead); s.fright = state.day;
+  logWorld('Monsters raid ' + s.name + ': ' + dead + ' citizen' + (dead === 1 ? ' is' : 's are') + ' killed.', '', s.id);
+}

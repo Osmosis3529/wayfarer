@@ -308,7 +308,7 @@ function warCouncil() {
     const note = [dist + ' leagues', s.people + ' citizens (' + scaleOf(s.people) + (npcWalls(s) ? ', walled' : '') + ')', moodOf(s), isHostile(s.id) ? 'at war with you' : '', ownerText(s)].filter(Boolean).join(' · ');
     return '<div class="up-row"><span>' + esc(s.name) + '<br><em>' + esc(note) + '</em></span><span>' + act + '</span></div>';
   }).join('') || '<p>You have not found any settlements yet. Explore the Briarwood.</p>';
-  const raid = state.raid ? '<p><strong>' + (state.raid.war ? 'A warband' : 'Raiders') + ' from ' + esc(state.raid.name) + '</strong> threaten Brackenford: ' + state.raid.left + ' of ' + state.raid.total + ' still at large.</p>' : '';
+  const raid = state.raid ? '<p><strong>' + (state.raid.monster ? 'Monsters from the wilds' : (state.raid.war ? 'A warband' : 'Raiders') + ' from ' + esc(state.raid.name)) + '</strong> threaten Brackenford: ' + state.raid.left + ' of ' + state.raid.total + ' still at large.</p>' : '';
   showDialog('<h2>War council</h2><p>' + soldierCount() + ' soldier' + (soldierCount() === 1 ? '' : 's') + ' of ' + state.town.people + ' citizens. Soldiers are citizens assigned to the barracks.</p>' + raid +
     (state.assignBackup ? '<button onclick="standDown()">Stand down · back to work</button>' : '<button onclick="callToArms()">Call every citizen to arms</button>') +
     escortControls('war') + '<h3>Wars between settlements</h3>' + npcWarRows() + '<h3>Settlements</h3>' + rows + '<button onclick="hallDialog()">Back</button><button onclick="closeDialog()">Leave</button>');
@@ -322,6 +322,8 @@ function raiderTiles() {
   for (const [k, e] of enemyBucket(overworld)) if (e.raid) out.push(k.split(',').map(Number));
   return out;
 }
+// How likely a settlement is to send raiders on a given day: its temper, and how tempting your stores look.
+function raidChance(s) { return s.aggression * RAID_RATE * raidAttraction(); }
 function startRaid(s, opts = {}) {
   ensureWarWorld();
   if (state.raid) return false;
@@ -379,6 +381,7 @@ function wipeHome() {
 }
 function raiderLoots(x, y) {
   removeEnemyData(overworld, x, y); overworld[y][x] = '.';
+  if (state.raid && state.raid.monster) return monsterStrikes();
   if (state.raid && state.raid.war) return raiderStrikes();
   const coin = Math.min(state.coin, 3 + Math.floor(state.coin * .1)), food = Math.min(state.town.food, 2 + Math.floor(state.town.people / 4));
   state.coin -= coin; state.town.food -= food;
@@ -400,6 +403,11 @@ function endRaid() {
   if (!r) return;
   state.raid = null;
   const s = townById(r.from);
+  if (r.monster) {
+    if (r.looted === 0) { const bounty = 4 * r.total; state.coin += bounty; say('The monsters are driven off! Grateful travelers leave a bounty of ' + bounty + ' coin.', 'gold'); logWorld('Brackenford drove off a monster raid.', 'gold'); }
+    else say('The monster raid is over: ' + r.looted + ' of them got through.', 'alert');
+    render(); return;
+  }
   if (r.war && state.hostile[r.from]) state.hostile[r.from].next = state.day + 4 + Math.floor(Math.random() * 3);
   if (r.looted === 0) {
     const reward = 5 * r.total; state.coin += reward;
@@ -618,9 +626,10 @@ function worldTurn() {
   raidDeadline(); hostilityTurn(); aidTurn(); npcWarTurn();
   if (state.day <= 6) return;
   maybeStartNpcWar();
+  monsterRaidTurn();
   for (const s of settlements.filter(t => !t.owner && !isAlly(t.id))) {
-    if (Math.random() >= s.aggression * RAID_RATE) continue;
-    const canRaidPlayer = !state.raid && (state.built.hut || state.built.longhouse) && Math.hypot(s.x - HOME.x, s.y - HOME.y) <= 100;
+    if (Math.random() >= raidChance(s)) continue;
+    const canRaidPlayer = !state.raid && (state.built.hut || state.built.longhouse) && Math.hypot(s.x - HOME.x, s.y - HOME.y) <= 100 * Math.sqrt(worldScale());
     if (canRaidPlayer) startRaid(s);
   }
 }

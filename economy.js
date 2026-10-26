@@ -37,11 +37,62 @@ let fuelCold = new Set();            // the buildings that found the furnace col
 function fuelBuildings() { return FUEL_BUILDINGS.filter(k => state.built[k] && crew(k) > 0); }
 function burnFuel() {
   fuelCold = new Set();
-  for (const k of fuelBuildings()) { if (state.inv.coal > 0) state.inv.coal--; else fuelCold.add(k); }
+  for (const k of fuelBuildings()) { if (!takeCoal()) fuelCold.add(k); }
   if (fuelCold.size) say('No coal in the stores: the ' + [...fuelCold].map(k => buildingName(k).toLowerCase()).join(' and the ') + ' work at half pace today.', 'alert');
 }
 function fuelFactor(key) { return fuelCold.has(key) ? .5 : 1; }
 function fuelNote() {
   const n = fuelBuildings().length;
   return n ? 'Coal: ' + (state.inv.coal || 0) + ' · burning ' + n + ' a day' : '';
+}
+
+// ---------------------------------------------------------------- surplus
+// What a settlement makes beyond what the stores hold is not thrown away while you have annexed settlements: it is shared
+// out among them. Meals go into their pantries and goods into their stores, which you collect from their halls and which
+// their furnaces burn first. Whatever they cannot hold is wasted, and a full store of surplus invites raiders (defense.js).
+const STORE_MAX = 100;
+function shareSurplus(over) {
+  const homes = settlements.filter(s => s.owner === 'player' && isColony(s.id));
+  if (!homes.length) return over;
+  const left = {}, sent = [];
+  for (const [k, n] of Object.entries(over)) {
+    if (!(n > 0)) continue;
+    let rest = n;
+    homes.forEach((s, i) => {
+      const share = Math.floor(n / homes.length) + (i < n % homes.length ? 1 : 0), rec = state.colonies[s.id];
+      let took;
+      if (k === 'meals') { took = Math.min(share, Math.max(0, supplyCap() - rec.town.food)); rec.town.food += took; if (state.cur === s.id) state.town.food = rec.town.food; }
+      else { const st = s.stock || (s.stock = {}); took = Math.min(share, Math.max(0, STORE_MAX - (st[k] || 0))); st[k] = (st[k] || 0) + took; }
+      rest -= took;
+      if (took) sent.push(took + ' ' + (k === 'meals' ? 'meals' : itemNames[k].toLowerCase()) + ' to ' + s.name);
+    });
+    if (rest > 0) left[k] = rest;
+  }
+  if (sent.length) say('Surplus shared with the settlements you annexed: ' + sent.join(', ') + '.', 'gold');
+  return left;
+}
+function storeLine(s) { return Object.entries(s.stock || {}).filter(([, n]) => n > 0).map(([k, n]) => n + ' ' + itemNames[k].toLowerCase()).join(', '); }
+// In an annexed settlement's hall: what has been put by for you.
+function storesBlock() {
+  if (!state.cur) return '';
+  const s = townById(state.cur), line = s && storeLine(s);
+  return line ? '<p>Stores put by here: ' + esc(line) + '.</p><button onclick="collectStock()">Collect the stores</button>' : '';
+}
+function collectStock() {
+  const s = state.cur && townById(state.cur);
+  if (!s) return;
+  const took = [];
+  for (const k of Object.keys(s.stock || {})) {
+    const n = Math.min(s.stock[k], k === 'meals' ? 0 : roomFor(k));
+    if (n > 0) { addItem(k, n, true); s.stock[k] -= n; took.push(n + ' ' + itemNames[k].toLowerCase()); }
+  }
+  say(took.length ? 'You collect ' + took.join(', ') + ' from ' + s.name + '’s stores.' : 'Your pack is full: there is no room to collect anything.', took.length ? 'gold' : 'alert');
+  render(); hallDialog();
+}
+// A furnace in an annexed settlement burns what that settlement has put by before it touches your pack.
+function takeCoal() {
+  const s = state.cur && townById(state.cur);
+  if (s && s.stock && s.stock.coal > 0) { s.stock.coal--; return true; }
+  if (state.inv.coal > 0) { state.inv.coal--; return true; }
+  return false;
 }

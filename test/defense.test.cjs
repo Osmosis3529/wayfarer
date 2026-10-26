@@ -26,7 +26,7 @@ async function game(fn) {
     };
     window.calm = () => { state.day = 5; for (const s of settlements) { s.aggression = 0; s.owner = null; } state.npcWars = []; };
     // open grass around Brackenford and the player parked well away
-    window.clearHome = () => { for (let y = 1; y < WORLD_H - 1; y++) for (let x = 1; x < WORLD_W - 1; x++) if (overworld[y][x] === 'g') { overworld[y][x] = '.'; enemyBucket(overworld).delete(x + ',' + y); } for (let y = HOME.y - 12; y <= HOME.y + 12; y++) for (let x = HOME.x - 12; x <= HOME.x + 12; x++) if (overworld[y][x] !== '⌂') overworld[y][x] = '.'; state.x = HOME.x + 40; state.y = HOME.y; };
+    window.clearHome = () => { for (let y = 1; y < WORLD_H - 1; y++) for (let x = 1; x < WORLD_W - 1; x++) if (overworld[y][x] === 'g') { overworld[y][x] = '.'; enemyBucket(overworld).delete(x + ',' + y); } for (let y = HOME.y - 25; y <= HOME.y + 25; y++) for (let x = HOME.x - 25; x <= HOME.x + 25; x++) if (overworld[y][x] !== '⌂' && !'SCDMK'.includes(overworld[y][x])) overworld[y][x] = '.'; state.x = HOME.x + 45; state.y = HOME.y; };
     window.raider = (dx, dy, extra = {}) => { const x = HOME.x + dx, y = HOME.y + dy; overworld[y][x] = 'g'; enemyBucket(overworld).set(x + ',' + y, { ...WAR_FOES.raider, faction: 'raid', raid: true, townId: 'town_0', ...extra }); return [x, y]; };
     window.tiles = () => { const out = []; for (let y = 1; y < WORLD_H - 1; y++) for (let x = 1; x < WORLD_W - 1; x++) if (overworld[y][x] === 'g') out.push([x, y]); return out; };
     window.cheb = ([x, y]) => Math.max(Math.abs(x - HOME.x), Math.abs(y - HOME.y));
@@ -195,4 +195,110 @@ test('walls show in the settlement lists, and saves keep Brackenford’s wall st
     return { text, pct: save.state.wallPct, after: [state.wallPct, state.built.walls] };
   });
   assert.ok(r.text.includes('(town, walled)'), r.text); assert.equal(r.pct, .35); assert.equal(r.after[1], false);
+}));
+
+// ---------------------------------------------------------------- monster raids and surplus
+test('monsters raid Brackenford on the map: a pack and its leader, marching on the town, eating the pantry instead of taking coin', () => game(async page => {
+  const r = await page.evaluate(() => {
+    RICH(); calm(); clearHome(); build('hut'); build('longhouse'); state.day = 12; const out = {};
+    const real = Math.random; let ok = false;
+    try { for (let i = 0; i < 20 && !ok; i++) ok = startMonsterRaid(); } finally { Math.random = real; }
+    const foes = tiles().map(([x, y]) => enemyBucket(overworld).get(x + ',' + y));
+    out.raid = { ok, monster: state.raid.monster, name: state.raid.name, from: state.raid.from, total: state.raid.total, left: state.raid.left, deadline: state.raid.deadline - state.day, log: state.log.find(l => l.t.includes('monsters'))?.t || '' };
+    out.foes = { n: foes.length, flagged: foes.every(f => f.raid && f.monster && f.faction === 'raid'), leader: foes.filter(f => f.bonus === 1).map(f => f.name), names: [...new Set(foes.map(f => f.name))].every(n => Object.values(enemyCatalog).some(e => e.name === n)) };
+    out.again = startMonsterRaid();
+    out.panel = (render(), document.getElementById('town-stats').textContent);
+    state.coin = 100; state.town.food = 30; state.town.people = 10; const people0 = state.town.people;
+    for (let i = 0; i < 2; i++) { const [x, y] = tiles()[0]; raiderLoots(x, y); }
+    out.struck = { coin: state.coin, food: state.town.food < 30, left: state.raid ? state.raid.left : 'done', log: state.log.map(l => l.t).some(t => t.includes('A monster gets into Brackenford')) };
+    return out;
+  });
+  assert.equal(r.raid.ok, true); assert.deepEqual([r.raid.monster, r.raid.name, r.raid.from], [true, 'the wilds', null]); assert.ok(r.raid.total >= 2 && r.raid.total <= 8 && r.raid.left === r.raid.total && r.raid.deadline === 2, JSON.stringify(r.raid));
+  assert.ok(r.raid.log.includes('coming out of the wilds'), r.raid.log); assert.equal(r.foes.n, r.raid.total); assert.equal(r.foes.flagged, true); assert.ok(r.foes.leader.includes('Thorn Stalker')); assert.equal(r.foes.names, true);
+  assert.equal(r.again, false); assert.ok(r.panel.includes('monsters from the wilds'), r.panel);
+  assert.equal(r.struck.coin, 100); assert.equal(r.struck.food, true); assert.equal(r.struck.log, true);
+}));
+
+test('driving the monsters off pays a bounty; a wall holds them, and soldiers stop what the wall does not', () => game(async page => {
+  const r = await page.evaluate(() => {
+    RICH(); calm(); clearHome(); build('hut'); build('longhouse'); const out = {};
+    const pack = n => { for (const [x, y] of tiles()) { overworld[y][x] = '.'; enemyBucket(overworld).delete(x + ',' + y); } for (let i = 0; i < n; i++) raider(8 + i, 0, { monster: true, faction: 'raid', raid: true }); state.raid = { from: null, name: 'the wilds', monster: true, left: n, total: n, deadline: state.day, looted: 0, killed: 0, war: false }; };
+    pack(3); state.coin = 50; for (const [x, y] of tiles()) { const foe = enemyBucket(overworld).get(x + ',' + y); removeEnemyData(overworld, x, y); overworld[y][x] = '.'; noteKill(foe); }
+    out.won = { coin: state.coin, raid: state.raid, log: state.log.map(l => l.t).find(t => t.includes('bounty')) };
+    build('walls'); pack(4); const c0 = state.coin; raidDeadline(); out.walled = { coin: state.coin - c0 - 16, hp: wallHpText(state, 'village') };   // 16 is the bounty for a raid nobody got through
+    state.built.walls = false; wallCache = null; state.built.barracks = true; state.assign.barracks = 2; pack(3); const f0 = state.town.food; raidDeadline(); out.soldiers = { fed: state.town.food < f0, log: state.log.map(l => l.t).find(t => t.includes('stop 2')) };
+    return out;
+  });
+  assert.equal(r.won.coin, 50 + 12); assert.equal(r.won.raid, null); assert.ok(r.won.log.includes('12 coin'), r.won.log);
+  assert.deepEqual(r.walled, { coin: 0, hp: '16 / 40 HP' }); assert.equal(r.soldiers.fed, true); assert.ok(r.soldiers.log, 'two soldiers stop two monsters');
+}));
+
+test('other settlements are raided at once: walls beat the monsters back, without them people die and stores are lost', () => game(async page => {
+  const r = await page.evaluate(() => {
+    RICH(); calm(); const [a, b] = settlements, out = {};
+    a.people = 10; a.cap = 10; a.walls = false; delete a.fright; resolveMonsterRaid(a); out.open = [a.people <= 9, a.people >= 8, a.fright === state.day, state.worldLog[0].t.includes('Monsters raid')];
+    a.walls = true; a.wallPct = 1; const p0 = a.people; resolveMonsterRaid(a); out.walled = [a.people === p0, a.wallPct, state.worldLog[0].t.includes('wall and are beaten back')];
+    a.people = 3; a.walls = false; resolveMonsterRaid(a); out.tiny = a.people;
+    b.owner = 'player'; ensureColonies(); b.discovered = true; state.colonies[b.id].town.people = 6; b.people = 6; b.stock = { wood: 10, stone: 5 }; const log0 = state.log.length;
+    resolveMonsterRaid(b); out.mine = [state.colonies[b.id].town.people, b.stock.wood, b.stock.stone, state.log[0].t.includes('A wall would have turned them back')];
+    state.colonies[b.id].built.walls = true; state.colonies[b.id].wallPct = 1; resolveMonsterRaid(b); out.mineWalled = [state.colonies[b.id].town.people, state.colonies[b.id].wallPct];
+    state.wars[a.id] = { total: 3, left: 3 }; a.people = 10; a.walls = false; resolveMonsterRaid(a); out.atWar = a.people;
+    return out;
+  });
+  assert.deepEqual(r.open, [true, true, true, true]); assert.deepEqual(r.walled, [true, .7, true]); assert.equal(r.tiny, 3);
+  assert.deepEqual(r.mine, [5, 5, 3, true]); assert.deepEqual(r.mineWalled, [5, .7]); assert.equal(r.atWar, 10);
+}));
+
+test('monster raids come now and then, more often when stores are full, and never twice at once', () => game(async page => {
+  const r = await page.evaluate(() => {
+    RICH(); calm(); clearHome(); build('hut'); build('longhouse'); state.day = 10; const out = {}, real = Math.random;
+    const turn = v => { for (const [x, y] of tiles()) { overworld[y][x] = '.'; enemyBucket(overworld).delete(x + ',' + y); } state.raid = null; Math.random = () => v; try { monsterRaidTurn(); } finally { Math.random = real; } return !!state.raid; };
+    for (const k of CAPPED) state.inv[k] = 0; state.town.food = 0;
+    out.plain = [turn(.0), turn(.5), turn(.99), raidAttraction()];
+    const rate = MONSTER_RAID_RATE; out.edge = [turn(rate * 1 - .001), turn(rate * 1 + .001)];
+    for (const k of ['wood', 'stone', 'coal', 'copper']) state.inv[k] = supplyCap(); state.town.food = supplyCap();
+    out.kinds = surplusKinds(); out.att = raidAttraction(); out.edgeFull = [turn(rate * out.att - .001), turn(rate * out.att + .001)];
+    for (const k of CAPPED) state.inv[k] = supplyCap(); state.town.food = supplyCap(); out.max = raidAttraction();
+    state.day = 3; out.early = turn(.0); state.day = 10; state.town.people = 0; out.empty = turn(.0); state.town.people = 10;
+    state.raid = { from: null, name: 'the wilds', monster: true, left: 2, total: 2, deadline: 99, looted: 0, killed: 0 }; Math.random = () => 0; try { monsterRaidTurn(); } finally { Math.random = real; } out.twice = state.raid.total;
+    return out;
+  });
+  assert.deepEqual(r.plain, [true, false, false, 1]); assert.deepEqual(r.edge, [true, false]); assert.equal(r.kinds, 5); assert.equal(r.att, 2); assert.deepEqual(r.edgeFull, [true, false]); assert.equal(r.max, 2.5);
+  assert.equal(r.early, false); assert.equal(r.empty, false); assert.equal(r.twice, 2);
+}));
+
+test('a surplus draws raiders: annexed settlements’ stores count too', () => game(async page => {
+  const r = await page.evaluate(() => {
+    RICH(); calm(); for (const k of CAPPED) state.inv[k] = 0; state.town.food = 0; const out = { base: raidAttraction() };
+    const a = settlements[0], b = settlements[1]; for (const s of [a, b]) s.owner = 'player'; ensureColonies(); a.stock = { wood: 20 }; b.stock = { stone: 25 };
+    out.stock = [stockTotal(), raidAttraction()];
+    a.stock = { wood: 100, stone: 100, coal: 100 }; out.big = raidAttraction();
+    // a settlement's chance of sending raiders is its temper times the attraction
+    for (const s of [a, b]) s.owner = null; ensureColonies(); for (const s of settlements) s.aggression = 0; const c = settlements[2]; c.aggression = .3; c.x = HOME.x + 20; c.y = HOME.y;
+    for (const k of CAPPED) state.inv[k] = 0; state.town.food = 0; const plain = raidChance(c);
+    for (const k of CAPPED) state.inv[k] = supplyCap(); state.town.food = supplyCap(); const att = raidAttraction();
+    out.att = att; out.chance = [plain, raidChance(c), +(plain * att).toFixed(6)]; out.temper = raidChance(settlements[3]);
+    return out;
+  });
+  assert.equal(r.base, 1); assert.deepEqual(r.stock, [45, 1.2]); assert.equal(r.big, 2.5); assert.equal(r.att, 2.5); assert.ok(Math.abs(r.chance[1] - r.chance[2]) < 1e-5 && r.chance[1] > r.chance[0] * 2.4, JSON.stringify(r.chance)); assert.equal(r.temper, 0);
+}));
+
+test('surplus is shared out among annexed settlements instead of wasted', () => game(async page => {
+  const r = await page.evaluate(() => {
+    RICH(); calm(); const [a, b] = settlements, out = {}; build('hut');
+    const cap = supplyCap(); state.inv.wood = cap; overflow = {}; addItem('wood', 10, true); reportOverflow();
+    out.none = state.log.map(l => l.t).find(t => t.includes('went to waste'));
+    for (const s of [a, b]) { s.owner = 'player'; s.discovered = true; s.stock = {}; } ensureColonies(); state.colonies[a.id].town.food = 5; state.colonies[b.id].town.food = 5;
+    state.inv.wood = cap; state.town.food = cap; overflow = {}; addItem('wood', 11, true); addFood(7); const log0 = state.log.length; reportOverflow();
+    out.shared = { wood: [a.stock.wood, b.stock.wood], meals: [state.colonies[a.id].town.food, state.colonies[b.id].town.food], note: state.log.map(l => l.t).find(t => t.includes('Surplus shared')), waste: state.log.slice(0, state.log.length - log0).some(l => l.t.includes('went to waste')) };
+    a.stock.wood = 98; state.inv.wood = cap; overflow = {}; addItem('wood', 10, true); reportOverflow(); out.limit = [a.stock.wood, b.stock.wood, state.log.map(l => l.t).find(t => t.includes('went to waste'))];
+    enterColony(a.id, true); out.hall = (hallDialog(), dialogText().includes('Stores put by here')); state.inv.wood = 0; state.inv.stone = 0;
+    a.stock = { wood: 12, stone: 5, coal: 3 }; collectStock(); out.collected = [state.inv.wood, state.inv.stone, a.stock.wood];
+    state.inv.coal = 10; a.stock.coal = 1; state.built.mine = true; state.assign.mine = 1; state.assign.jeweler = 0; fuelCold = new Set(); burnFuel(); out.coal = [a.stock.coal, state.inv.coal]; burnFuel(); out.coal2 = [a.stock.coal, state.inv.coal];
+    return out;
+  });
+  assert.ok(r.none && r.none.includes('annex a settlement'), r.none);
+  assert.deepEqual(r.shared.wood, [6, 5]); assert.deepEqual(r.shared.meals, [9, 8]); assert.ok(r.shared.note.includes('timber') && r.shared.note.includes('meals'), r.shared.note); assert.equal(r.shared.waste, false);
+  assert.equal(r.limit[0], 100); assert.equal(r.limit[1], 10); assert.ok(r.limit[2] && r.limit[2].includes('went to waste'), r.limit[2]);
+  assert.equal(r.hall, true); assert.deepEqual(r.collected, [12, 5, 0]); assert.deepEqual(r.coal, [0, 10]); assert.deepEqual(r.coal2, [0, 9]);
 }));

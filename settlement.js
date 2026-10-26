@@ -164,14 +164,15 @@ function addItem(key, n = 1, quiet) {
   if (!CAPPED.includes(key)) { state.inv[key] += n; return n; }
   const got = Math.min(n, roomFor(key));
   state.inv[key] += got;
-  if (got < n) { if (quiet) overflowNote(itemNames[key].toLowerCase(), n - got); else say('You cannot carry more ' + itemNames[key].toLowerCase() + ' (' + supplyCap() + ').', 'alert'); }
+  if (got < n) { if (quiet) overflowNote(key, n - got); else say('You cannot carry more ' + itemNames[key].toLowerCase() + ' (' + supplyCap() + ').', 'alert'); }
   return got;
 }
 function addFood(n) { const got = Math.min(Math.max(0, n), roomForFood()); state.town.food += got; overflowNote('meals', n - got); return got; }
 function reportOverflow() {
-  const list = Object.entries(overflow).filter(([, n]) => n > 0).map(([k, n]) => n + ' ' + k);
+  const over = shareSurplus(overflow), nameOf = k => k === 'meals' ? 'meals' : itemNames[k].toLowerCase();
+  const list = Object.entries(over).filter(([, n]) => n > 0).map(([k, n]) => n + ' ' + nameOf(k));
   overflow = {};
-  if (list.length) say('Storage is full (limit ' + supplyCap() + '): ' + list.join(', ') + ' went to waste. A staffed warehouse and its upgrades raise the limit.', 'alert');
+  if (list.length) say('Storage is full (limit ' + supplyCap() + '): ' + list.join(', ') + ' went to waste. A staffed warehouse and its upgrades raise the limit' + (annexedCount() ? ', and the settlements you annexed hold what you cannot' : ', or annex a settlement to share the surplus with') + '.', 'alert');
 }
 // Workers who bring back one random thing each from a table of [item, weight].
 function produceDrops(key, table, who) {
@@ -569,10 +570,11 @@ function barracksDialog(key) {
 }
 function beaconDialog() { showDialog('<h2>' + esc(bld('beacon')) + '</h2><p>The Beacon stands lit over Brackenford.</p><button onclick="closeDialog()">Leave</button>'); }
 function hallDialog() {
+  const stores = storesBlock();
   const tier = state.town.tier || 1, prog = tierProgress(), goal = UPGRADE_KEYS.length;
   showDialog('<h2>' + esc(hallName()) + '</h2><p><strong>' + TIER_NAMES[tier] + '</strong> · ' + state.town.people + ' / ' + housingCap() + ' citizens · ' + unassigned() + ' without work · pantry ' + state.town.food + ' meals' + (state.starving ? ' (starving!)' : '') + '</p><p>Growth: <strong>' + esc(growthLabel()) + '</strong>. Newcomers arrive when the pantry holds plenty of meals per citizen: about 2 per citizen for the odd traveler, 4 for one a day, 8 for two a day.</p>' +
     '<p>Upgrades this tier: ' + prog + ' / ' + goal + (tier < 3 ? '. Buy them all and ' + settleName() + ' evolves.' : (state.town.maxed ? '. Fully evolved.' : '. Buy them all to complete the City.')) + '</p>' +
-    '<button onclick="upgradesDialog()">Settlement upgrades</button><button onclick="citizensDialog()">Citizens and jobs</button>' + (state.built.barracks && !state.cur ? '<button onclick="warCouncil()">War council</button>' : '') + '<button onclick="hallRest()">Rest here · free</button><button onclick="closeDialog()">Leave</button>');
+    stores + '<button onclick="upgradesDialog()">Settlement upgrades</button><button onclick="citizensDialog()">Citizens and jobs</button>' + (state.built.barracks && !state.cur ? '<button onclick="warCouncil()">War council</button>' : '') + '<button onclick="hallRest()">Rest here · free</button><button onclick="closeDialog()">Leave</button>');
 }
 function longhouseDialog() {
   const tier = state.town.tier || 1;
@@ -665,7 +667,7 @@ function renderTown() {
     '<div class="town-metric">Growth<b>' + esc(growthLabel()) + '</b></div>' +
     '<div class="town-metric">Projects<b>' + built + ' / ' + Object.keys(state.built).length + ' built</b></div>' +
     (annexedCount() && !state.cur ? '<div class="town-metric">Annexed<b>' + annexedCount() + ' settlement' + (annexedCount() === 1 ? '' : 's') + '</b></div>' : '') +
-    (state.raid ? '<div class="town-metric">Raid<b>' + state.raid.left + ' raiders from ' + esc(state.raid.name) + '</b></div>' : '');
+    (state.raid ? '<div class="town-metric">Raid<b>' + state.raid.left + (state.raid.monster ? ' monsters from the wilds' : ' raiders from ' + esc(state.raid.name)) + '</b></div>' : '');
   const rows = JOB_KEYS.filter(k => crew(k) > 0).map(k => '<div class="town-person"><b>' + esc(JOB_TITLES[k]) + (crew(k) > 1 ? ' ×' + crew(k) : '') + '</b><span>' + esc(buildingName(k)) + '</span></div>');
   if (unassigned() > 0) rows.push('<div class="town-person"><b>Citizen ×' + unassigned() + '</b><span>Waiting for work · assign at the ' + esc(hallName().toLowerCase()) + '</span></div>');
   document.getElementById('townfolk').innerHTML = rows.join('');
