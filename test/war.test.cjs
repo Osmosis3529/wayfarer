@@ -102,16 +102,17 @@ test('marching soldiers fight beside you in battle, and the foe may turn on them
       try {
         startCombat(ex, ey, state.x, state.y);
         const hp0 = state.combat.hp, mine = state.hp, soldiers = state.soldiers.map(g => g.hp);
+        const def = mobStats(state.combat.enemy, state.combat.level).defense, mineHit = playerStrike(false, def), theirs = enemyDamage(state.combat.level, state.combat.enemy), guardHit = soldierDamage(def);
         battleAction('attack');
-        const out = { dealt: hp0 - state.combat.hp, myLoss: mine - state.hp, soldierHurt: state.soldiers.some((g, i) => g.hp < (soldiers[i] ?? 99)) };
+        const out = { mineHit, theirs, guardHit, dealt: hp0 - state.combat.hp, myLoss: mine - state.hp, soldierHurt: state.soldiers.some((g, i) => g.hp < (soldiers[i] ?? 99)) };
         state.combat = null; closeDialog();
         return out;
       } finally { Math.random = real; }
     };
     return { alone: run(0), marching: run(3) };
   });
-  assert.equal(r.alone.dealt, 3); assert.equal(r.alone.myLoss, 1); assert.equal(r.alone.soldierHurt, false);
-  assert.equal(r.marching.dealt, 3 + 3 * 2); assert.equal(r.marching.myLoss, 0); assert.equal(r.marching.soldierHurt, true);
+  assert.equal(r.alone.dealt, r.alone.mineHit); assert.equal(r.alone.myLoss, r.alone.theirs); assert.equal(r.alone.soldierHurt, false);
+  assert.equal(r.marching.dealt, r.marching.mineHit + 3 * r.marching.guardHit); assert.equal(r.marching.myLoss, 0); assert.equal(r.marching.soldierHurt, true);
 }));
 
 test('a soldier who falls in battle is replaced for 2 meals, and the marching order stays', () => game(async page => {

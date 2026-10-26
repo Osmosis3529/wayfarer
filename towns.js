@@ -169,44 +169,44 @@ function npcShopAction(id, kind, side, item) {
   else { const price = regionPrice(s, item, 'sell'); state.inv[item]--; state.coin += price; say(s.name + ' buys ' + itemNames[item].toLowerCase() + ' for ' + price + ' coin.', 'gold'); }
   render(); npcShop(s, kind);
 }
-// A smith's best work depends on the size of the settlement.
-function smithTier(s) { return Math.min(4, townBracket(s.people) + 1); }
-function gearPrice(s, tier) { return Math.round([20, 45, 80, 140][tier - 1] * (1 + 0.1 * (s.bias || 0))); }
+// A smith's best work depends on the size of the settlement; the stock is the two best tiers of every slot.
+function smithTier(s) { return Math.min(MAX_GEAR_TIER, townBracket(s.people) + 1); }
+function gearPrice(s, tier, slot = 'weapon') { return Math.max(1, Math.round(basePrice(tier, slot) * (1 + 0.1 * (s.bias || 0)) * charmBuyMod())); }
 function gearRows(s, top) {
-  const rows = [];
-  for (const slot of ['weapon', 'armor']) for (let t = 1; t <= top; t++) {
-    const g = GEAR[slot][t - 1], better = slot === 'weapon' ? g.damage > state.equipped.weapon.damage : g.health > state.equipped.armor.health, price = gearPrice(s, t);
-    rows.push({ slot, tier: t, gear: g, better, price, label: g.name + ' · ' + (slot === 'weapon' ? '+' + g.damage + ' damage' : '+' + g.health + ' hearts') });
-  }
-  return rows;
+  return gearRowsAt(top).map(g => ({ slot: g.slot, tier: g.tier, gear: g, better: gearBetter(g, g.slot), price: gearPrice(s, g.tier, g.slot), label: g.name + ' · ' + modsText(g.mods) }));
 }
 function npcSmithy(s) {
-  const rows = gearRows(s, smithTier(s)).map(r => '<button ' + (r.better && state.coin >= r.price ? '' : 'disabled') + ' onclick="buyGear(\'' + s.id + '\',\'' + r.slot + '\',' + r.tier + ')">' + esc(r.label) + ' · ' + r.price + ' coin' + (r.better ? '' : ' (no better than yours)') + '</button>').join('');
-  showDialog('<h2>' + swatch(s.id) + esc(s.name) + ' smithy</h2><p>The smith sells finished weapons and armor. You wear a ' + esc(state.equipped.weapon.name) + ' (+' + state.equipped.weapon.damage + ') and ' + esc(state.equipped.armor.name) + ' (+' + state.equipped.armor.health + ').</p>' + rows + '<button onclick="closeDialog()">Leave</button>');
+  const stock = gearRows(s, smithTier(s)), rows = gearShelves(stock.map(r => r.gear), g => {
+    const r = stock.find(x => x.gear === g);
+    return '<div class="up-row"><span>' + esc(g.name) + ' <em>tier ' + g.tier + ' · ' + esc(modsText(g.mods)) + (r.better ? '' : ' · no better than yours') + '</em></span><button ' + (state.coin >= r.price ? '' : 'disabled') + ' onclick="buyGear(\'' + s.id + '\',\'' + g.id + '\')">' + r.price + ' coin</button></div>';
+  });
+  const worn = GEAR_SLOTS.map(k => esc(SLOT_NAMES[k]) + ': ' + esc(state.equipped[k] ? state.equipped[k].name : 'nothing')).join(' · ');
+  showDialog('<h2>' + swatch(s.id) + esc(s.name) + ' smithy</h2><p>The smith sells finished weapons, helmets, armor and leggings (tier ' + smithTier(s) + ' work: bigger settlements make better gear). Anything better goes on at once; the rest waits in your pack.</p><p class="cap">You wear — ' + worn + '</p>' + rows + '<button onclick="closeDialog()">Leave</button>');
 }
-function buyGear(id, slot, tier) {
-  const s = townById(id);
-  if (!s || !inSettlement(s) || tier < 1 || tier > smithTier(s) || !GEAR[slot]) return;
-  const g = GEAR[slot][tier - 1], price = gearPrice(s, tier);
+function buyGear(id, a, tier) {
+  const s = townById(id), g = GEAR_BY_ID[a] || (GEAR[a] && GEAR[a][tier - 1] && GEAR[a][tier - 1][0]);
+  if (!s || !inSettlement(s) || !g || g.tier > smithTier(s)) return;
+  const price = gearPrice(s, g.tier, g.slot);
   if (state.coin < price) { say('The smith wants ' + price + ' coin.', 'alert'); npcSmithy(s); return; }
-  if (!equipGear(slot, g)) { say('That is no better than what you wear.', 'alert'); npcSmithy(s); return; }
-  state.coin -= price; say('You buy ' + g.name + ' for ' + price + ' coin and put it on.', 'gold');
+  state.coin -= price;
+  acquireGear(g, s.name + '’s smithy', 'Bought');
   render(); npcSmithy(s);
 }
+const NPC_WELL_HEAL = 8;
 function npcWell(s) {
-  const r = relOf(s.id), heal = 2;
-  showDialog('<h2>' + swatch(s.id) + esc(s.name) + ' well</h2><p>Cool, clean water, free to travelers. It restores ' + heal + ' hearts, once a day in each settlement.</p><button onclick="drinkNpcWell(\'' + s.id + '\')">Drink · heal ' + heal + ' hearts</button><button onclick="closeDialog()">Leave</button>');
+  const r = relOf(s.id), heal = NPC_WELL_HEAL;
+  showDialog('<h2>' + swatch(s.id) + esc(s.name) + ' well</h2><p>Cool, clean water, free to travelers. It restores ' + heal + ' HP, once a day in each settlement.</p><button onclick="drinkNpcWell(\'' + s.id + '\')">Drink · heal ' + heal + ' HP</button><button onclick="closeDialog()">Leave</button>');
 }
 function drinkNpcWell(id) {
   const s = townById(id);
   if (!s || !inSettlement(s)) return;
   const r = relOf(id);
   if (r.wellDay === state.day) { say('The bucket needs time to refill (once a day).', 'alert'); render(); return; }
-  r.wellDay = state.day; state.hp = Math.min(state.maxHp, state.hp + 2); say('Cool water restores your strength.', 'gold'); render(); closeDialog();
+  r.wellDay = state.day; state.hp = Math.min(state.maxHp, state.hp + NPC_WELL_HEAL); say('Cool water restores your strength.', 'gold'); render(); closeDialog();
 }
 function innDialog(s) {
   const cost = 5 + (s.bias || 0);
-  showDialog('<h2>' + esc(s.name) + ' inn</h2><p>A warm bed and a hot meal. Spend the night and your hearts are restored; the day moves on.</p><button ' + (state.coin >= cost ? '' : 'disabled') + ' onclick="paidRest(\'' + s.id + '\')">Rest for the night · ' + cost + ' coin</button><button onclick="closeDialog()">Leave</button>');
+  showDialog('<h2>' + esc(s.name) + ' inn</h2><p>A warm bed and a hot meal. Spend the night and your HP is restored; the day moves on.</p><button ' + (state.coin >= cost ? '' : 'disabled') + ' onclick="paidRest(\'' + s.id + '\')">Rest for the night · ' + cost + ' coin</button><button onclick="closeDialog()">Leave</button>');
 }
 const FAMILIES = LAST_NAMES;
 function houseDialog(s, p) {
@@ -245,7 +245,7 @@ function renderVisitPanel() {
     '<div class="town-metric">Ruler<b>' + esc(owner || 'its own people') + '</b></div>';
   const uses = { market: 'trade goods', inn: 'rest for coin', travel: 'world map and fast travel', hall: 'news and war', well: 'free healing', huntersLodge: 'furs and game', smithy: 'weapons and armor', jeweler: 'gems, silver and gold', mine: 'stone and ore' };
   document.getElementById('townfolk').innerHTML = ['market', 'inn', 'travel', 'hall', 'well', 'huntersLodge', 'smithy', 'jeweler', 'mine'].map(k => { const p = plots.find(q => q.kind === k); return p ? '<div class="town-person"><b>' + esc(p.name) + '</b><span>' + uses[k] + '</span></div>' : ''; }).join('') + '<div class="town-person"><b>' + plots.filter(p => p.kind === 'house').length + ' homes</b><span>' + s.people + ' citizens live here</span></div>';
-  document.getElementById('town-hint').textContent = 'Walk into a door to go in, or into a citizen to talk. The market trades regional goods, the inn restores your hearts, the caravan post opens the world map (fast travel is arranged from any settlement you have visited), the hall lets you declare war, and bigger settlements also have a well, a hunters’ lodge, a smithy, a jeweler and a mine. The town grows and shrinks as its people do, and its map with it.';
+  document.getElementById('town-hint').textContent = 'Walk into a door to go in, or into a citizen to talk. The market trades regional goods, the inn restores your HP, the caravan post opens the world map (fast travel is arranged from any settlement you have visited), the hall lets you declare war, and bigger settlements also have a well, a hunters’ lodge, a smithy, a jeweler and a mine. The town grows and shrinks as its people do, and its map with it.';
 }
 
 // ---------------------------------------------------------------- annexed settlements, run like Brackenford

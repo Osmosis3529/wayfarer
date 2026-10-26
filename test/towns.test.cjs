@@ -387,7 +387,7 @@ test('inside another settlement: the lodge, mine and jeweler trade their goods, 
   const r = await page.evaluate(() => {
     const s = discover(1)[0]; s.people = 13; state.x = s.x; state.y = s.y; enterSettlement(s.id); closeDialog();
     const door = kind => { const [k, p] = Object.entries(npcMap().plots).find(([, q]) => q.kind === kind); return k; };
-    state.coin = 300; state.inv.furs = 0; state.hp = 1; state.maxHp = 5;
+    state.coin = 900; state.inv.furs = 0; state.hp = 1;
     npcBuilding(door('huntersLodge')); const lodge = dialogText(); npcShopAction(s.id, 'huntersLodge', 'buy', 'furs'); const furs = state.inv.furs;
     npcShopAction(s.id, 'huntersLodge', 'sell', 'furs'); const sold = state.inv.furs;
     npcShopAction(s.id, 'huntersLodge', 'buy', 'gems'); const wrongGood = state.inv.gems;     // a lodge does not deal in gems
@@ -404,9 +404,9 @@ test('inside another settlement: the lodge, mine and jeweler trade their goods, 
   assert.ok(r.lodge.includes('Hunters’ lodge') && r.lodge.includes('Buy Furs'), r.lodge); assert.equal(r.furs, 1); assert.equal(r.sold, 0); assert.equal(r.wrongGood, 0);
   assert.ok(r.jewel.includes('Gems') && r.jewel.includes('Silver') && r.jewel.includes('Gold'), r.jewel);
   assert.ok(r.mine.includes('Copper') && r.mine.includes('Iron') && r.mine.includes('Stone'), r.mine);
-  assert.ok(r.smithy.includes('Hunter’s spear') && r.smithy.includes('Moonsteel blade') && r.smithy.includes('Warden’s plate') && r.top === 4, r.smithy);
-  assert.deepEqual(r.weapon, ['Hunter’s spear', r.price]); assert.equal(r.noDowngrade, 'Hunter’s spear'); assert.equal(r.maxHp, 5 + 4);
-  assert.deepEqual(r.hp, [3, 1, 3]);        // +2 hearts; no second drink the same day; the next day it works again
+  assert.ok(r.smithy.includes('Hunter’s spear') && r.smithy.includes('Steel saber') && r.smithy.includes('Scale hauberk') && r.smithy.includes('Plumed sallet') && r.top === 4 && !r.smithy.includes('Moonsteel'), r.smithy);
+  assert.deepEqual(r.weapon, ['Hunter’s spear', r.price]); assert.equal(r.noDowngrade, 'Hunter’s spear'); assert.equal(r.maxHp, 4 * (3 + 2));   // the hauberk adds 2 Health
+  assert.deepEqual(r.hp, [9, 1, 9]);        // +8 HP; no second drink the same day; the next day it works again
 }));
 
 test('roads follow the world that is loaded, even when two saves have the same number of road tiles', () => game(async page => {

@@ -465,7 +465,8 @@ function talkLine(p) {
   return pick + (extra.length ? ' ' + extra[townHash(p.idx + 3, state.day) % extra.length] : '');
 }
 function talkTo(p) {
-  showDialog('<h2>' + esc(p.name) + '</h2><p><em>' + esc(JOB_TITLES[p.job] || 'Citizen') + '</em></p><p>' + esc(talkLine(p)) + '</p><button onclick="closeDialog()">Goodbye</button>');
+  const home = npcVisit() ? townById(state.visiting) : { id: state.visiting || 'home', people: state.town.people }, t = personStats(home, p);
+  showDialog('<h2>' + esc(p.name) + '</h2><p><em>' + esc(JOB_TITLES[p.job] || 'Citizen') + '</em> · <span class="cap">Charm ' + t.charm + ' · Health ' + t.health + ' · Attack ' + t.attack + ' · Defense ' + t.defense + '</span></p><p>' + esc(talkLine(p)) + '</p><button onclick="closeDialog()">Goodbye</button>');
 }
 function jobsAt(key) { return townPeople.filter(p => p.job === key); }
 function staffBlock(key) {
@@ -539,9 +540,9 @@ function buyMeals(key, n) {
   state.coin -= cost; addFood(n); say('The pantry gains ' + n + ' meal' + (n > 1 ? 's' : '') + '.', 'gold');
   render(); openBuilding(key);
 }
-function wellHeal() { return 2 + upgradesBought('well'); }
+function wellHeal() { return 8 + 4 * upgradesBought('well'); }
 function wellDialog(key) {
-  showDialog('<h2>' + esc(bld(key)) + '</h2><p>Cold, clean water, free to anyone and needing no keeper. It restores ' + wellHeal() + ' hearts once a day; upgrades make it heal more.</p><button onclick="drinkWell()">Drink from the well · heal ' + wellHeal() + ' hearts</button><button onclick="closeDialog()">Leave</button>');
+  showDialog('<h2>' + esc(bld(key)) + '</h2><p>Cold, clean water, free to anyone and needing no keeper. It restores ' + wellHeal() + ' HP once a day; upgrades make it heal more.</p><button onclick="drinkWell()">Drink from the well · heal ' + wellHeal() + ' HP</button><button onclick="closeDialog()">Leave</button>');
 }
 function drinkWell() {
   if (state.wellDay === state.day) { say('The bucket needs time to refill (once a day).', 'alert'); render(); return; }
@@ -576,7 +577,7 @@ function longhouseDialog() {
   const tier = state.town.tier || 1;
   showDialog('<h2>' + esc(bld('longhouse')) + '</h2><p>The longhouse is where the settlement sleeps. It houses up to <strong>' + [12, 24, 36][tier - 1] + '</strong> citizens as a ' + TIER_NAMES[tier] + ' (24 as a Town, 36 as a City) and does nothing else: jobs and upgrades are run from the ' + esc(hallName().toLowerCase()) + '.</p><p>' + state.town.people + ' / ' + housingCap() + ' citizens live here · growth: <strong>' + esc(growthLabel()) + '</strong>.</p><button onclick="closeDialog()">Leave</button>');
 }
-function hallRest() { state.hp = state.maxHp; say('You rest in the ' + hallName().toLowerCase() + ' and recover all hearts.', 'gold'); render(); closeDialog(); }
+function hallRest() { state.hp = state.maxHp; say('You rest in the ' + hallName().toLowerCase() + ' and recover all your HP.', 'gold'); render(); closeDialog(); }
 function upgradesDialog() {
   ensureSettlementState();
   const tier = state.town.tier || 1;
@@ -587,7 +588,7 @@ function upgradesDialog() {
     return '<div class="up-row"><span>' + esc(bld(k)) + '</span><button ' + (canAfford(cost) && canStaffUpgrade(tier) ? '' : 'disabled') + ' onclick="buyUpgrade(\'' + k + '\')">Upgrade · ' + costText(cost) + '</button></div>';
   }).join('');
   const total = JOB_KEYS.reduce((n, k) => n + upgradesBought(k), 0) + upgradesBought('hut');
-  showDialog('<h2>Settlement upgrades</h2><p>Tier ' + tier + ' (' + TIER_NAMES[tier] + '): ' + tierProgress() + ' / ' + UPGRADE_KEYS.length + ' bought. ' + (tier < 3 ? 'Every one of them evolves ' + settleName() + ' to a ' + TIER_NAMES[tier + 1] + ', then a costlier set opens.' : 'This is the last tier.') + '</p><p>Each upgrade makes that building’s workers produce 50% more, permanently (' + total + ' bought so far). Warehouse upgrades instead raise every supply limit by 100, and well upgrades heal one more heart per drink.</p><p>' + (canStaffUpgrade(tier) ? 'Staffing: ' : '<strong>Not enough citizens to upgrade.</strong> ') + esc(staffNote(tier)) + '.</p>' + rows + '<button onclick="hallDialog()">Back</button><button onclick="closeDialog()">Leave</button>');
+  showDialog('<h2>Settlement upgrades</h2><p>Tier ' + tier + ' (' + TIER_NAMES[tier] + '): ' + tierProgress() + ' / ' + UPGRADE_KEYS.length + ' bought. ' + (tier < 3 ? 'Every one of them evolves ' + settleName() + ' to a ' + TIER_NAMES[tier + 1] + ', then a costlier set opens.' : 'This is the last tier.') + '</p><p>Each upgrade makes that building’s workers produce 50% more, permanently (' + total + ' bought so far). Warehouse upgrades instead raise every supply limit by 100, and well upgrades heal 4 more HP per drink.</p><p>' + (canStaffUpgrade(tier) ? 'Staffing: ' : '<strong>Not enough citizens to upgrade.</strong> ') + esc(staffNote(tier)) + '.</p>' + rows + '<button onclick="hallDialog()">Back</button><button onclick="closeDialog()">Leave</button>');
 }
 function citizensDialog() {
   ensureSettlementState();

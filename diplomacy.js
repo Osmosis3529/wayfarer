@@ -67,9 +67,9 @@ function turnInQuest(id) {
   const s = townById(id), r = relOf(id), q = r.quest;
   if (!s || !q || !inSettlement(s) || !questReady(q)) return;
   if (q.type === 'gather') state.inv[q.item] -= q.n;
-  state.coin += q.reward; r.favor++; r.done++; r.quest = null;
+  const pay = charmReward(q.reward); state.coin += pay; r.favor += favorGain(); r.done++; r.quest = null;
   s.aggression = Math.max(0, +(s.aggression - 0.05).toFixed(2));
-  say(s.name + ' pays you ' + q.reward + ' coin and thinks better of you' + (r.favor === FAVOR_FOR_DEAL && !isAlly(id) ? ': they would now sign a trade deal' : '') + '.', 'gold');
+  say(s.name + ' pays you ' + pay + ' coin and thinks better of you' + (r.favor >= FAVOR_FOR_DEAL && !isAlly(id) ? ': they would now sign a trade deal' : '') + '.', 'gold');
   render(); npcHallDialog(s);
 }
 function abandonQuest(id) {
@@ -156,7 +156,7 @@ function bestGear(s, spare) {
   let best = null;
   for (const r of gearRows(s, smithTier(s))) {
     if (!r.better || state.coin - r.price < spare) continue;
-    const gain = r.slot === 'weapon' ? r.gear.damage - state.equipped.weapon.damage : r.gear.health - state.equipped.armor.health;
+    const gain = gearScore(r.gear) - gearScore(state.equipped[r.slot]);
     if (!best || gain > best.gain || (gain === best.gain && r.price < best.price)) best = { ...r, gain };
   }
   return best;

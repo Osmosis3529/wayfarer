@@ -228,8 +228,9 @@ test('common enemies are weaker than a leveled player', () => game(async page =>
   const r = await page.evaluate(() => {
     let wins = 0, total = 0;
     for (const name of ['wolf', 'boar', 'bandit']) for (let i = 0; i < 60; i++) {
-      state.level = 3; state.maxHp = 6; state.hp = 6; state.inv.berries = 0; state.coin = 10; state.x = HOME.x + 12; state.y = HOME.y;
-      state.equipped = { weapon: { name: 'Bronze knife', damage: 1 }, armor: { name: 'Padded vest', health: 1 } };
+      state.level = 3; state.stats = { charm: 2, health: 5, attack: 4, defense: 3 };   // a level 3 player spent 4 points on top of the start
+      state.equipped = startGear(); state.bag = []; equipGear('weapon', GEAR.weapon[0][0]); equipGear('armor', GEAR.armor[0][0]); recalcStats(true);
+      state.inv.berries = 0; state.coin = 10; state.x = HOME.x + 12; state.y = HOME.y;
       const x = state.x + 1, y = state.y; overworld[y][x] = 'g'; enemyBucket(overworld).set(x + ',' + y, { ...enemyCatalog[name] });
       startCombat(x, y, state.x, state.y);
       for (let t = 0; t < 40 && state.combat; t++) battleAction(state.focus > 0 ? 'heavy' : 'attack');
@@ -247,12 +248,12 @@ test('soldiers fight instead of instantly killing, and gear changes the outcome'
     const rounds = () => { const [g, x, y] = place(); let n = 0; while (overworld[y][x] === 'g' && state.soldiers.includes(g) && n < 60) { soldierFight(g, x, y); n++; g.hp = g.maxHp; } return n; };
     const avg = () => { let t = 0; for (let i = 0; i < 20; i++) t += rounds(); return t / 20; };
     const bare = avg();
-    state.equipped.weapon = { name: 'Iron longsword', damage: 3 }; state.equipped.armor = { name: 'Ring mail', health: 3 }; syncSoldiers();
+    equipGear('weapon', GEAR_BY_ID.weapon3a); equipGear('armor', GEAR_BY_ID.armor3a); syncSoldiers();
     const geared = avg();
     return { bare, geared, hpGeared: state.soldiers[0].maxHp };
   });
   assert.ok(r.bare > 1.5, 'unarmed soldiers still one-shot: ' + r.bare);
-  assert.ok(r.geared < r.bare); assert.equal(r.hpGeared, 9);
+  assert.ok(r.geared < r.bare); assert.equal(r.hpGeared, 20);   // (3 + 2 health from the ring mail) * 4
 }));
 
 test('a fallen soldier is replaced for 2 meals, or waits until the pantry can pay', () => game(async page => {
@@ -513,19 +514,19 @@ test('defeating a guardian grants a relic with its effect, and relics survive de
       closeDialog(); return boss;
     };
     const dun = dungeons.find(d => d.miniBoss === 'aegis'), maxHp0 = state.maxHp, lvl0 = state.level;
-    const boss = fight(dun); const got = { relic: state.relics.aegis, hearts: state.maxHp - maxHp0 - (state.level - lvl0) };   // minus the hearts from levelling up
+    const boss = fight(dun); const got = { relic: state.relics.aegis, hp: state.maxHp - maxHp0 };   // levelling up spends points later; only the relic adds HP now
     exitInstance(); state.coin = 100; state.inv.wood = 10; state.hp = 1; state.x = HOME.x + 12; state.y = HOME.y;
     const x = state.x + 1, y = state.y; overworld[y][x] = 'g'; enemyBucket(overworld).set(x + ',' + y, { ...enemyCatalog.wolf }); startCombat(x, y, state.x, state.y); state.combat.enemy.attack = 99; enemyTurn();
     return { boss, got, afterDeath: state.relics.aegis, woodLost: state.inv.wood < 10, left: miniBossSites().filter(t => !state.relics[t.miniBoss]).length };
   });
-  assert.equal(r.boss, 'Brannoch, the Iron Warden'); assert.deepEqual(r.got, { relic: true, hearts: 2 });
+  assert.equal(r.boss, 'Brannoch, the Iron Warden'); assert.deepEqual(r.got, { relic: true, hp: 8 });   // +2 Health
   assert.equal(r.afterDeath, true); assert.equal(r.woodLost, true); assert.equal(r.left, 4);
 }));
 
 test('each relic changes the game as described', () => game(async page => {
   const r = await page.evaluate(() => {
     const out = {};
-    showDialog('<div id="enemy-hp"></div><div id="battle-status"></div><button id="heavy-button"></button><button id="item-button"></button>');
+    showDialog('<div id="enemy-hp"></div><div id="enemy-stats"></div><div id="player-hp"></div><div id="battle-status"></div><button id="heavy-button"></button><button id="item-button"></button><button id="intimidate-button"></button>');
     state.maxHp = 10; out.healBase = healAmount(); state.relics.heartstone = true; out.healRelic = healAmount();
     const area = () => { state.explored.forEach(r => r.fill(false)); state.x = HOME.x; state.y = HOME.y; revealArea(); return state.explored.flat().filter(Boolean).length; };
     out.sightBase = area(); state.relics.lantern = true; out.sightRelic = area();
@@ -537,7 +538,7 @@ test('each relic changes the game as described', () => game(async page => {
     Math.random = rnd; out.mossback = base - rel;
     return out;
   });
-  assert.equal(r.healBase, 3); assert.equal(r.healRelic, 5); assert.ok(r.sightRelic > r.sightBase * 1.5); assert.equal(r.gatherRelic, 3); assert.ok(r.mossback >= 38 && r.mossback <= 40);
+  assert.equal(r.healBase, 3); assert.equal(r.healRelic, 5); assert.ok(r.sightRelic > r.sightBase * 1.5); assert.equal(r.gatherRelic, 3); assert.ok(r.mossback >= 40 * 2, 'two more Defense should soften every blow: ' + r.mossback);
 }));
 
 test('slaying every guardian reveals the final dungeon', () => game(async page => {
