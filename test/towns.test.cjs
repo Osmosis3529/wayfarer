@@ -69,7 +69,7 @@ test('the world map shows what you have explored and found, and fast travel is o
     const inside = { rides: [...document.querySelectorAll('#dialog button')].filter(x => x.textContent.startsWith('Ride')).map(x => [x.textContent, x.disabled]), text: dialogText() };
     return { dark, seen, marker, outside, inside, a: a.name, b: b.name, canvas: [cv.width, cv.height] };
   });
-  assert.deepEqual(r.canvas, [183 * 3, 135 * 3]); assert.notEqual(r.dark, r.seen); assert.notEqual(r.marker, r.seen);
+  assert.deepEqual(r.canvas, [224 * 3, 165 * 3]); assert.notEqual(r.dark, r.seen); assert.notEqual(r.marker, r.seen);
   assert.ok(r.outside.text.includes('Fast travel is arranged from inside a settlement') && r.outside.rides.every(d => d), JSON.stringify(r.outside));
   assert.ok(r.inside.text.includes(r.a) && r.inside.text.includes(r.b) && r.inside.text.includes('you are here'), r.inside.text);
   const rideA = r.inside.rides.find(x => true);

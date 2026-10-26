@@ -23,6 +23,7 @@ function ensureWarWorld() {
     if (!Number.isFinite(s.aggression)) s.aggression = +(Math.random() * 0.5).toFixed(2);
     if (!('owner' in s)) s.owner = null;
   }
+  assignDestinies();
   ensureRivalries();
   ensureColonies();
 }

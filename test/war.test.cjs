@@ -300,7 +300,7 @@ test('natural enemy spawning does not count war armies and raiders against its c
   const r = await page.evaluate(() => {
     RICH(); const natural = () => foeBox().filter(f => !f.e.faction).length;
     clearRect(5, 5, 60, 40);
-    for (let i = 0; i < OW_CAP + 5; i++) { const x = 6 + (i % 50), y = 6 + Math.floor(i / 50) * 2; overworld[y][x] = 'g'; enemyBucket(overworld).set(x + ',' + y, { ...WAR_FOES.raider, faction: 'raid', raid: true, townId: 'town_0' }); }
+    for (let i = 0; i < owCap() + 5; i++) { const x = 6 + (i % 50), y = 6 + Math.floor(i / 50) * 2; overworld[y][x] = 'g'; enemyBucket(overworld).set(x + ',' + y, { ...WAR_FOES.raider, faction: 'raid', raid: true, townId: 'town_0' }); }
     const before = natural(); spawnEnemy();
     return { before, after: natural() };
   });

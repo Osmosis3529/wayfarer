@@ -2,7 +2,7 @@
 // Loaded after settlement.js and war.js; like them it uses the main script's globals at call time.
 
 // ---------------------------------------------------------------- who is who: a colour for every settlement
-const SETTLEMENT_COLORS = ['#e0554d', '#e8902f', '#e8c93a', '#9bd34a', '#2fb5a0', '#4aa3df', '#6a73e8', '#a35fd6', '#e05fa3', '#b9835a', '#9aa5b1', '#4fd6e6', '#ef8f9f', '#d9a441', '#7be0b0', '#a83255'];
+const SETTLEMENT_COLORS = ['#e0554d', '#e8902f', '#e8c93a', '#9bd34a', '#2fb5a0', '#4aa3df', '#6a73e8', '#a35fd6', '#e05fa3', '#b9835a', '#9aa5b1', '#4fd6e6', '#ef8f9f', '#d9a441', '#7be0b0', '#a83255', '#ff7f50', '#8a2be2', '#c9b037', '#d2691e', '#3f51b5', '#e6a8d7', '#7a8f3a', '#33708a'];
 const BRACKENFORD_COLOR = '#3fb36b';
 function settlementColor(id) {
   if (!id || id === 'home') return BRACKENFORD_COLOR;
