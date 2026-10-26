@@ -82,7 +82,7 @@ function moveEscort() {
   const folks = escorts();
   if (!folks.length) return;
   const occupied = new Set([...state.workers, ...state.soldiers].map(w => w.x + ',' + w.y)); occupied.add(state.x + ',' + state.y);
-  const marked = (x, y) => BUILDING_MARKS.some(b => x === HOME.x + b.dx && y === HOME.y + b.dy);
+  const marked = (x, y) => !!markTile(x, y);
   const free = (x, y) => x > 0 && y > 0 && x < WORLD_W - 1 && y < WORLD_H - 1 && overworld[y][x] === '.' && !occupied.has(x + ',' + y) && !marked(x, y);
   const place = (g, x, y) => {
     noteStep(g.id, x - g.x); occupied.delete(g.x + ',' + g.y); g.x = x; g.y = y; occupied.add(x + ',' + y);
@@ -599,10 +599,10 @@ function aidRows() {
 // ---------------------------------------------------------------- the world's own politics, once a day
 function worldTurn() {
   ensureWarWorld();
+  growSettlements();
   for (const s of settlements) {
     if (s.owner === 'player') continue;
     s.aggression = +clamp(s.aggression + (Math.random() - .5) * .06, 0, MAX_AGGRESSION).toFixed(2);
-    if (s.people < s.cap && Math.random() < .12) s.people++;
     // what a settlement holds is what a winner takes: a few of its plentiful goods pile up each day
     const st = stockOf(s); for (const k of (s.surplus || [])) st[k] = Math.min(40, (st[k] || 0) + Math.max(1, Math.round(s.people / 4)));
     if (s.wreck > 0 && !warOf(s.id) && Math.random() < .7) s.wreck = Math.max(0, s.wreck - 1 - Math.floor(s.people / 6));

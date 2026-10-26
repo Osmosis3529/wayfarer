@@ -145,7 +145,7 @@ test('a ruler keeps at most three subjects, ruled settlements start no wars and 
 
 test('a settlement that is ruled by another sometimes rebels and is free again, and never while it is a handful of people', () => game(async page => {
   const r = await page.evaluate(() => {
-    calm(); const [a, b, c] = settlements; b.owner = a.id; c.owner = a.id; a.discovered = b.discovered = true; b.people = 8; c.people = 3; b.cap = 8; c.cap = 3;
+    calm(); const [a, b, c] = settlements; b.owner = a.id; c.owner = a.id; a.discovered = b.discovered = true; b.people = 8; c.people = 3; b.cap = 8; c.cap = 3; b.goal = 8; c.goal = 3;   // nobody grows during the test
     const real = Math.random; Math.random = () => 0.001;
     try { worldTurn(); } finally { Math.random = real; }
     const out = { b: b.owner, c: c.owner, news: state.log.some(l => l.t.includes('throws off')) };
