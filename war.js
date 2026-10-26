@@ -139,7 +139,7 @@ function escortTakesHit(b) {
   const fs = escortInFight();
   if (!fs.length || Math.random() >= fs.length / (fs.length + 1)) return false;
   b.guarded = false;
-  const g = fs[Math.floor(Math.random() * fs.length)], dmg = Math.max(1, enemyDamage(b.level, b.enemy));
+  const g = fs[Math.floor(Math.random() * fs.length)], dmg = Math.max(1, enemyDamage(b.level, b.enemy, soldierDefense()));
   g.hp -= dmg;
   say('The ' + b.enemy.name + ' turns on one of your soldiers for ' + dmg + ' damage.', 'alert');
   if (g.hp <= 0) soldierFalls(g, b.enemy.name);
@@ -409,7 +409,7 @@ function endRaid() {
   const s = townById(r.from);
   if (r.monster) {
     if (r.looted === 0) { const bounty = 4 * r.total; state.coin += bounty; say('The monsters are driven off! Grateful travelers leave a bounty of ' + bounty + ' coin.', 'gold'); logWorld('Brackenford drove off a monster raid.', 'gold'); }
-    else say('The monster raid is over: ' + r.looted + ' of them got through.', 'alert');
+    else { say('The monster raid is over: ' + r.looted + ' of them got through.', 'alert'); logWorld('Monsters got into Brackenford.', 'alert'); }
     render(); return;
   }
   if (r.war && state.hostile[r.from]) state.hostile[r.from].next = state.day + 4 + Math.floor(Math.random() * 3);

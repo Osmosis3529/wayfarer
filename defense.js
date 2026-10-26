@@ -173,7 +173,7 @@ function resolveMonsterRaid(s) {
   }
   if (mine) {
     if (!rec || rec.town.people <= 1) return;
-    rec.town.people--; s.people = rec.town.people;
+    withContext(s.id, () => loseCitizens(1)); s.people = rec.town.people;
     const lost = {}; for (const k of Object.keys(s.stock || {})) { const n = Math.floor(s.stock[k] / 2); if (n) { s.stock[k] -= n; lost[k] = n; } }
     const text = 'Monsters raid ' + s.name + ': a citizen is killed' + (Object.keys(lost).length ? ' and ' + Object.entries(lost).map(([k, n]) => n + ' ' + itemNames[k].toLowerCase()).join(', ') + ' of its stores are eaten or smashed' : '') + '. A wall would have turned them back.';
     say(text, 'alert'); logWorld(text, 'alert', s.id); return;

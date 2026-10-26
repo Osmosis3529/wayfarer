@@ -258,3 +258,18 @@ test('people have stats too: a citizen shows theirs, and soldiers carry the stat
   assert.ok(r.person[1].charm > r.person[0].charm && r.person[1].health > r.person[0].health);
   assert.ok(r.geared.defense > r.plain.defense && r.geared.attack > r.plain.attack && r.geared.health > r.plain.health); assert.equal(r.hp, 4 * r.geared.health);
 }));
+
+test('with a full pack, the piece you swap out is sold rather than lost, and soldiers are hit using their own Defense', () => game(async page => {
+  const r = await page.evaluate(() => {
+    for (let i = 0; i < BAG_SIZE; i++) state.bag.push(copyGear(GEAR_BY_ID.helmet1b));
+    equipGear('weapon', GEAR_BY_ID.weapon2a); const c0 = state.coin; const log0 = state.log.length;
+    equipGear('weapon', GEAR_BY_ID.weapon4a);
+    const sold = state.coin - c0, v = gearValue(GEAR_BY_ID.weapon2a), logged = state.log[0].t.includes('was sold');
+    acquireGear(GEAR_BY_ID.armor3a, 'a test'); const c1 = state.coin; acquireGear(GEAR_BY_ID.armor5a, 'a test'); const armorSold = state.coin - c1;
+    state.stats.defense = 30; recalcStats(); const real = Math.random; Math.random = () => 0.5; let soldier, player;
+    try { soldier = enemyDamage(10, enemyCatalog.wolf, soldierDefense()); player = enemyDamage(10, enemyCatalog.wolf); } finally { Math.random = real; }
+    return { sold, v, logged, bag: state.bag.length, armorSold, armorV: gearValue(GEAR_BY_ID.armor3a), soldier, player };
+  });
+  assert.equal(r.sold, r.v); assert.equal(r.logged, true); assert.equal(r.bag, 12); assert.equal(r.armorSold, r.armorV);
+  assert.ok(r.soldier > r.player, 'soldiers do not enjoy your Defense: ' + r.soldier + ' vs ' + r.player);
+}));

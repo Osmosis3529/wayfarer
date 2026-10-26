@@ -484,7 +484,7 @@ function buildPrompt(key) {
   else if (!canStaffNew(key)) tail = '<p>Nobody is free to staff it: ' + state.town.people + ' citizens already work in ' + staffedBuildings() + ' buildings. Every working building needs its own citizen, so the settlement must grow first. A full pantry attracts newcomers.</p>';
   else if (key === 'beacon' && ((state.town.tier || 1) < 3 || !state.inv.sunstone)) tail = '<p>The Beacon needs a City and a Sunstone from the Hollow King. Cost: ' + costLabel(key) + '.</p>';
   else tail = '<button ' + (canAfford(cost) ? '' : 'disabled') + ' onclick="closeDialog();build(\'' + key + '\');if(state.built[\'' + key + '\'])openBuilding(\'' + key + '\')">Build · ' + costLabel(key) + '</button>';
-  showDialog('<h2>Empty plot</h2><p>A fenced lot waits for a ' + bld(key).toLowerCase() + '.</p>' + tail + '<button onclick="closeDialog()">Leave</button>');
+  showDialog('<h2>Empty plot</h2><p>A fenced lot waits for ' + (key === 'walls' ? 'the walls' : 'a ' + bld(key).toLowerCase()) + '.</p>' + tail + '<button onclick="closeDialog()">Leave</button>');
 }
 function openBuilding(key) {
   if (npcVisit()) { npcBuilding(key); return; }

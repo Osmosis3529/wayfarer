@@ -221,9 +221,16 @@ function stashGear(g) {
   return true;
 }
 // Puts the piece on if it beats what you wear; the old piece goes in the pack. Returns whether it was worn.
+// What you were wearing goes in the pack, or is sold if the pack is full.
+function setAside(old) {
+  if (!old || !old.tier || stashGear(old)) return;
+  const coin = gearValue(old);
+  state.coin += coin;
+  say('Your pack is full, so the ' + old.name + ' was sold for ' + coin + ' coin.');
+}
 function equipGear(slot, gear) {
   if (!gearBetter(gear, slot)) return false;
-  stashGear(state.equipped[slot]);
+  setAside(state.equipped[slot]);
   state.equipped[slot] = copyGear(gear);
   recalcStats();
   return true;
@@ -262,8 +269,7 @@ function sellFromBag(i) {
 function acquireGear(g, source, how) {
   const verb = how || 'Found';
   if (gearBetter(g, g.slot)) {
-    const old = state.equipped[g.slot];
-    stashGear(old);
+    setAside(state.equipped[g.slot]);
     state.equipped[g.slot] = copyGear(g);
     recalcStats();
     say(verb + ' ' + g.name + ' in ' + source + '; put it on (' + modsText(g.mods) + ').', 'gold');
