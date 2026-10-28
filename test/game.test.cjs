@@ -228,8 +228,9 @@ test('common enemies are weaker than a leveled player', () => game(async page =>
   const r = await page.evaluate(() => {
     let wins = 0, total = 0;
     for (const name of ['wolf', 'boar', 'bandit']) for (let i = 0; i < 60; i++) {
-      state.level = 3; state.maxHp = 6; state.hp = 6; state.inv.berries = 0; state.coin = 10; state.x = HOME.x + 12; state.y = HOME.y;
-      state.equipped = { weapon: { name: 'Bronze knife', damage: 1 }, armor: { name: 'Padded vest', health: 1 } };
+      state.level = 3; state.stats = { charm: 2, health: 5, attack: 4, defense: 3 };   // a level 3 player spent 4 points on top of the start
+      state.equipped = startGear(); state.bag = []; equipGear('weapon', GEAR.weapon[0][0]); equipGear('armor', GEAR.armor[0][0]); recalcStats(true);
+      state.inv.berries = 0; state.coin = 10; state.x = HOME.x + 12; state.y = HOME.y;
       const x = state.x + 1, y = state.y; overworld[y][x] = 'g'; enemyBucket(overworld).set(x + ',' + y, { ...enemyCatalog[name] });
       startCombat(x, y, state.x, state.y);
       for (let t = 0; t < 40 && state.combat; t++) battleAction(state.focus > 0 ? 'heavy' : 'attack');
@@ -247,12 +248,12 @@ test('soldiers fight instead of instantly killing, and gear changes the outcome'
     const rounds = () => { const [g, x, y] = place(); let n = 0; while (overworld[y][x] === 'g' && state.soldiers.includes(g) && n < 60) { soldierFight(g, x, y); n++; g.hp = g.maxHp; } return n; };
     const avg = () => { let t = 0; for (let i = 0; i < 20; i++) t += rounds(); return t / 20; };
     const bare = avg();
-    state.equipped.weapon = { name: 'Iron longsword', damage: 3 }; state.equipped.armor = { name: 'Ring mail', health: 3 }; syncSoldiers();
+    equipGear('weapon', GEAR_BY_ID.weapon3a); equipGear('armor', GEAR_BY_ID.armor3a); syncSoldiers();
     const geared = avg();
     return { bare, geared, hpGeared: state.soldiers[0].maxHp };
   });
   assert.ok(r.bare > 1.5, 'unarmed soldiers still one-shot: ' + r.bare);
-  assert.ok(r.geared < r.bare); assert.equal(r.hpGeared, 9);
+  assert.ok(r.geared < r.bare); assert.equal(r.hpGeared, 20);   // (3 + 2 health from the ring mail) * 4
 }));
 
 test('a fallen soldier is replaced for 2 meals, or waits until the pantry can pay', () => game(async page => {
@@ -430,19 +431,22 @@ test('holding the on-screen pad walks, and the buttons act', () => phone(async p
   assert.ok(r.walked >= 3, 'walked ' + r.walked); assert.equal(r.stopped, true); assert.ok(r.hp > 1); assert.equal(r.facing, -1);
 }));
 
-test('the menu drawer opens, pauses the world, and holds the side panels', () => phone(async page => {
+test('the menu button opens the pop-up menu, which pauses the world, and the header buttons live in its settings tab', () => phone(async page => {
   const r = await page.evaluate(async () => {
-    manualPause = false; await new Promise(r => setTimeout(r, 300)); const closed = document.getElementById('log').getBoundingClientRect().left >= innerWidth - 1;
-    document.getElementById('t-menu').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
-    await new Promise(r => setTimeout(r, 400));
-    const open = document.getElementById('log').getBoundingClientRect().left < innerWidth - 100;
+    manualPause = false; await new Promise(r => setTimeout(r, 300));
+    const press = () => document.getElementById('t-menu').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
+    const hidden = [...document.querySelectorAll('.stats .save-btn')].every(b => getComputedStyle(b).display === 'none'), side = getComputedStyle(document.querySelector('.side')).display;
+    press(); await new Promise(r => setTimeout(r, 300));
+    const open = document.getElementById('overlay').style.display === 'grid', tabs = [...document.querySelectorAll('#dialog .tabs button')].map(b => b.textContent);
     const c0 = state.clock; await new Promise(r => setTimeout(r, 600)); const frozen = state.clock === c0;
-    const tools = [...document.querySelectorAll('#drawer-tools button')].map(b => b.textContent);
-    document.getElementById('drawer-close').click(); await new Promise(r => setTimeout(r, 300));
+    openMenu('settings'); const tools = [...document.querySelectorAll('#dialog button')].map(b => b.textContent);
+    press(); await new Promise(r => setTimeout(r, 300)); const closed = document.getElementById('overlay').style.display === 'none';
     const c1 = state.clock; await new Promise(r => setTimeout(r, 600));
-    return { closed, open, frozen, tools: tools.length, resumed: state.clock > c1 };
+    return { hidden, side, open, tabs, frozen, tools, closed, resumed: state.clock > c1, drawer: !!document.getElementById('drawer-close') };
   });
-  assert.deepEqual(r, { closed: true, open: true, frozen: true, tools: r.tools, resumed: true }); assert.ok(r.tools >= 4);
+  assert.equal(r.hidden, true); assert.equal(r.side, 'none'); assert.equal(r.open, true); assert.deepEqual(r.tabs, ['Stats', 'Inventory', 'Map', 'Journal', 'World logs', 'Settings']); assert.equal(r.frozen, true);
+  assert.ok(['Save world', 'Export save'].every(t => r.tools.includes(t)) && r.tools.some(t => t.startsWith('Graphics:')) && r.tools.some(t => t.startsWith('Art:')), r.tools.join());
+  assert.equal(r.closed, true); assert.equal(r.resumed, true); assert.equal(r.drawer, false);
 }));
 
 test('held upright the map shows a tall slice, the pad sits below it, and turning the phone switches views', () => phone(async page => {
@@ -513,19 +517,19 @@ test('defeating a guardian grants a relic with its effect, and relics survive de
       closeDialog(); return boss;
     };
     const dun = dungeons.find(d => d.miniBoss === 'aegis'), maxHp0 = state.maxHp, lvl0 = state.level;
-    const boss = fight(dun); const got = { relic: state.relics.aegis, hearts: state.maxHp - maxHp0 - (state.level - lvl0) };   // minus the hearts from levelling up
+    const boss = fight(dun); const got = { relic: state.relics.aegis, hp: state.maxHp - maxHp0 };   // levelling up spends points later; only the relic adds HP now
     exitInstance(); state.coin = 100; state.inv.wood = 10; state.hp = 1; state.x = HOME.x + 12; state.y = HOME.y;
     const x = state.x + 1, y = state.y; overworld[y][x] = 'g'; enemyBucket(overworld).set(x + ',' + y, { ...enemyCatalog.wolf }); startCombat(x, y, state.x, state.y); state.combat.enemy.attack = 99; enemyTurn();
     return { boss, got, afterDeath: state.relics.aegis, woodLost: state.inv.wood < 10, left: miniBossSites().filter(t => !state.relics[t.miniBoss]).length };
   });
-  assert.equal(r.boss, 'Brannoch, the Iron Warden'); assert.deepEqual(r.got, { relic: true, hearts: 2 });
+  assert.equal(r.boss, 'Brannoch, the Iron Warden'); assert.deepEqual(r.got, { relic: true, hp: 8 });   // +2 Health
   assert.equal(r.afterDeath, true); assert.equal(r.woodLost, true); assert.equal(r.left, 4);
 }));
 
 test('each relic changes the game as described', () => game(async page => {
   const r = await page.evaluate(() => {
     const out = {};
-    showDialog('<div id="enemy-hp"></div><div id="battle-status"></div><button id="heavy-button"></button><button id="item-button"></button>');
+    showDialog('<div id="enemy-hp"></div><div id="enemy-stats"></div><div id="player-hp"></div><div id="battle-status"></div><button id="heavy-button"></button><button id="item-button"></button><button id="intimidate-button"></button>');
     state.maxHp = 10; out.healBase = healAmount(); state.relics.heartstone = true; out.healRelic = healAmount();
     const area = () => { state.explored.forEach(r => r.fill(false)); state.x = HOME.x; state.y = HOME.y; revealArea(); return state.explored.flat().filter(Boolean).length; };
     out.sightBase = area(); state.relics.lantern = true; out.sightRelic = area();
@@ -537,7 +541,7 @@ test('each relic changes the game as described', () => game(async page => {
     Math.random = rnd; out.mossback = base - rel;
     return out;
   });
-  assert.equal(r.healBase, 3); assert.equal(r.healRelic, 5); assert.ok(r.sightRelic > r.sightBase * 1.5); assert.equal(r.gatherRelic, 3); assert.ok(r.mossback >= 38 && r.mossback <= 40);
+  assert.equal(r.healBase, 3); assert.equal(r.healRelic, 5); assert.ok(r.sightRelic > r.sightBase * 1.5); assert.equal(r.gatherRelic, 3); assert.ok(r.mossback >= 40 * 2, 'two more Defense should soften every blow: ' + r.mossback);
 }));
 
 test('slaying every guardian reveals the final dungeon', () => game(async page => {

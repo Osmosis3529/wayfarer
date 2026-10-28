@@ -33,7 +33,7 @@ const P={
 };
 for(const r of Object.values(P))if(r.length!==8||r.some(x=>x.length!==8))throw new Error('bad sprite');
 const HOUSES={market:['#c9a227','#3a6f9c'],smithy:['#444b50','#ff7a2b'],huntersLodge:['#3b7a3b','#e0b894'],jeweler:['#8a5fb0','#f0a0ff'],lumberMill:['#8a5a2b','#d9a066'],mine:['#6a6f73','#111111'],house:['#8a5a2b','#d8c8a0'],caravanPost:['#7a5a33','#df4a3a'],longhouse:['#7a4a2b','#e5bd69'],fishingHut:['#3a6f9c','#9ad0f0'],barracks:['#7d2a24','#cfd6dc']};
-const ORES={c:'#d9822b',i:'#5a7fa8',s:'#ffffff',a:'#f3d44a','◆':'#c46bf0'};
+const ORES={k:'#3b3f46',c:'#d9822b',i:'#5a7fa8',s:'#ffffff',a:'#f3d44a','◆':'#c46bf0'};
 const ENEMY_ART={
  beast:['X.X.....','XXX....X','XEXXXXXX','.XXXXXXX','..XXXXXx','..X.X.X.','..x.x.x.','........'],
  humanoid:['..xxxx..','.xXXXXx.','.XXEEXX.','XXXXXXXX','.XXXXXX.','.XX..XX.','.xx..xx.','........'],
@@ -51,6 +51,7 @@ const ICONS={
  stone:{p:['........','...AA...','..AAWA..','.AAAAaA.','.AaAAaaA','AaaAaKaa','aKaaaKKa','.KKKKKK.']},
  berries:{p:P.berry},
  relic:{p:['..yyyy..','.yYYYYy.','yYyyyyYy','yYyYYyYy','yYyYYyYy','yYyyyyYy','.yYYYYy.','..yyyy..']},
+ coal:{p:['........','........','..XXXXX.','.XYYYYXX','XXXXXXX.','XxxxxxX.','........','........'],o:{X:'#3b3f46',Y:'#6b7480',x:'#1b1e22'}},
  copper:{p:['........','........','..XXXXX.','.XYYYYXX','XXXXXXX.','XxxxxxX.','........','........'],o:{X:'#d9822b',Y:'#f0a860',x:'#8a4a14'}},
  iron:{p:['........','........','..XXXXX.','.XYYYYXX','XXXXXXX.','XxxxxxX.','........','........'],o:{X:'#8a95a5',Y:'#c0c8d2',x:'#4a5360'}},
  silver:{p:['........','........','..XXXXX.','.XYYYYXX','XXXXXXX.','XxxxxxX.','........','........'],o:{X:'#cfd6dc',Y:'#ffffff',x:'#8c968e'}},
@@ -78,7 +79,7 @@ function enemySprite(name){const look=ENEMY_LOOK[name]||['beast','#8c968e','#4a5
 function portrait(name){if(!portraits[name]){const sp=skinOn&&SKIN_PORTRAITS[name],s=sp?cut(skinSheets[sp[0]],sp[1],sp[2]):enemySprite(name),c=document.createElement('canvas');c.width=c.height=96;const x=c.getContext('2d');x.imageSmoothingEnabled=false;x.fillStyle='#111a14';x.fillRect(0,0,96,96);x.drawImage(s,8,8,80,80);portraits[name]=c.toDataURL()}return portraits[name]}
 cache.tree_spent=build(P.treeSpent);cache.rock_spent=build(P.rockSpent);cache.berry_spent=build(P.berry,{r:'#4f8f3c'});cache.ore_spent=build(P.ore,{X:'#3b4540'});
 cache.b_garden=cache.farm;cache.b_well=cache.well;cache.b_warehouse=cache.camp;cache.b_beacon=cache.beacon;
-const SPRITE_OF={'♣':'tree','▲':'rock','%':'berry','?':'chest','g':'enemy','x':'fox','C':'cave','D':'dungeon','K':'keep','M':'mine','S':'town','⌂':'town','<':'stairL','>':'stairR',c:'ore_c',i:'ore_i',s:'ore_s',a:'ore_a','◆':'ore_◆'};
+const SPRITE_OF={'♣':'tree','▲':'rock','%':'berry','?':'chest','g':'enemy','x':'fox','C':'cave','D':'dungeon','K':'keep','M':'mine','S':'town','⌂':'town','<':'stairL','>':'stairR',k:'ore_k',c:'ore_c',i:'ore_i',s:'ore_s',a:'ore_a','◆':'ore_◆'};
 function hash(x,y){return (Math.imul(x,73856093)^Math.imul(y,19349663))>>>0}
 function base(ctx,kind,x,y,px,py,frame,edges){
  const h=hash(x,y);
@@ -102,7 +103,7 @@ const SKIN_TILES={tree:['rpg',13,9],tree_spent:['rpg',22,10],rock:['rpg',54,21],
  home:['rpg',32,0],town:['rpg',33,0],cave:['rpg',40,8],dungeon:['rpg',42,9],keep:['rpg',44,9],mine:['rpg',36,1],stairL:['rpg',50,25],stairR:['rpg',51,25],ore_spent:['rpg',54,20],
  b_market:['rpg',10,0],b_garden:['rpg',22,11],b_well:['rpg',24,0],b_smithy:['rpg',15,0],b_huntersLodge:['rpg',48,10],b_jeweler:['rpg',43,11],b_lumberMill:['rpg',53,21],b_mine:['rpg',49,21],b_caravanPost:['rpg',51,12],b_longhouse:['rpg',32,0],b_fishingHut:['rpg',53,18],b_warehouse:['rpg',46,10],b_barracks:['rpg',50,0],b_beacon:['rpg',18,8]};
 const SKIN_WORKERS=[[0,5],[1,5],[0,6],[1,6],[0,7],[1,7],[0,9],[1,9]];
-const SKIN_ORES={c:'#d9822b',i:'#7fb2d8',s:'#ffffff',a:'#f3d44a','◆':'#c46bf0'};
+const SKIN_ORES={k:'#3b3f46',c:'#d9822b',i:'#7fb2d8',s:'#ffffff',a:'#f3d44a','◆':'#c46bf0'};
 const SKIN_PORTRAITS={'Roadside Bandit':['chars',0,8],'Kobold Delver':['chars',1,3],'Grave Cultist':['chars',1,10],'Moss Troll':['chars',0,3],'Crypt Ogre':['chars',1,8],'Forgotten Warden':['chars',0,11],'The Hollow King':['chars',1,10],'Restless Skeleton':['chars',1,11],'Barrow Ghoul':['chars',1,3]};
 let skinSheets=null;
 function cut(sheet,col,row){const c=document.createElement('canvas');c.width=c.height=T;c.getContext('2d').drawImage(sheet,col*17,row*17,16,16,0,0,T,T);return c}
@@ -195,6 +196,6 @@ function plotArt(key,built,tier,w,h,doorCol){
 function townPlot(ctx,key,built,rx,ry,w,h,isDoor,px,py,tier,doorCol){
  const id=key+'|'+(built?1:0)+'|'+tier+'|'+w+'x'+h;let art=plotCache[id];if(!art)art=plotCache[id]=plotArt(key,built,tier,w,h,doorCol);
  ctx.drawImage(art,rx*T,ry*T,T,T,px,py,T,T)}
-const OV={'.':'#34603a','≈':'#2e5f86','♣':'#255a2c','▲':'#8c968e','%':'#b5483a','#':'#2b3330','?':'#c4a0dc','g':'#df4a3a','x':'#d9822b','C':'#8fc4b2','D':'#e58b72','K':'#ff5a4a','M':'#9a6c3f','⌂':'#e5bd69','S':'#e5bd69',c:'#d9822b',i:'#5a7fa8',s:'#ffffff',a:'#f3d44a','◆':'#c46bf0','<':'#e5bd69','>':'#e5bd69'};
+const OV={'.':'#34603a','≈':'#2e5f86','♣':'#255a2c','▲':'#8c968e','%':'#b5483a','#':'#2b3330','?':'#c4a0dc','g':'#df4a3a','x':'#d9822b','C':'#8fc4b2','D':'#e58b72','K':'#ff5a4a','M':'#9a6c3f','⌂':'#e5bd69','S':'#e5bd69',k:'#4a4f58',c:'#d9822b',i:'#5a7fa8',s:'#ffffff',a:'#f3d44a','◆':'#c46bf0','<':'#e5bd69','>':'#e5bd69'};
 return {T,townTile,townPlot,setSkin,workerKey,skinActive:()=>skinOn,base,sprite,shadow,bar,tint,portrait,icon,SPRITE_OF,overview:c=>OV[c]||'#34603a'};
 })();

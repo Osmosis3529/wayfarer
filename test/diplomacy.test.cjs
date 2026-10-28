@@ -143,11 +143,11 @@ test('caravans run the deals: each caravaner one deal, a trip every two days, se
     const out = {};
     out.running1 = runningDeals().length; state.assign.caravanPost = 2; out.running2 = runningDeals().length;
     const d = state.deals[a.id]; d.sell = 'wood'; d.buy = 'iron'; d.gear = true;
-    state.inv.wood = 40; state.inv.iron = 0; state.coin = 300; state.equipped.weapon = { name: 'Traveler’s knife', damage: 0 }; state.equipped.armor = { name: 'Travel clothes', health: 0 };
+    state.inv.wood = 40; state.inv.iron = 0; state.coin = 300; state.equipped = startGear(); state.bag = [];
     const sellP = regionPrice(a, 'wood', 'sell'), buyP = regionPrice(a, 'iron', 'buy'), load = caravanLoad();
     d.last = state.day; caravanTurn(); out.tooSoon = [state.inv.wood, state.inv.iron];
-    state.day += 2; const coin0 = state.coin, gear0 = state.equipped.weapon.damage + state.equipped.armor.health; caravanTurn();
-    out.trip = { wood: 40 - state.inv.wood, iron: state.inv.iron, load, sellP, buyP, gear: state.equipped.weapon.damage + state.equipped.armor.health > gear0, trips: d.trips, other: state.deals[b.id].trips, coinMoved: state.coin - coin0, profit: d.profit };
+    state.day += 2; const worn = () => GEAR_SLOTS.reduce((n, k) => n + gearScore(state.equipped[k]), 0), coin0 = state.coin, gear0 = worn(); caravanTurn();
+    out.trip = { wood: 40 - state.inv.wood, iron: state.inv.iron, load, sellP, buyP, gear: worn() > gear0, trips: d.trips, other: state.deals[b.id].trips, coinMoved: state.coin - coin0, profit: d.profit };
     out.log = state.log.slice(0, 3).map(l => l.t).find(t => t.startsWith('The caravan from ' + a.name));
     // the reserve is never sold, and nothing is bought without coin
     state.inv.wood = 7; state.coin = 12; d.last = state.day - 2; d.gear = false; caravanTurn(); out.reserve = [state.inv.wood, state.coin >= 10];
@@ -168,11 +168,11 @@ test('the caravan post shows the deals and lets you change what the caravans car
     state.x = HOME.x + 2; state.y = HOME.y; interact(); const text = dialogText();
     const click = label => [...document.querySelectorAll('#dialog button')].find(b => b.textContent.startsWith(label)).click();
     click('Sell:'); const sell1 = state.deals[a.id].sell; click('Buy:'); const buy1 = state.deals[a.id].buy; click('Equipment:'); const gear = state.deals[a.id].gear;
-    for (let i = 0; i < 12; i++) click('Sell:'); const cycled = state.deals[a.id].sell;
-    click('End the deal'); return { text, sell1, buy1, gear, cycled, ally: isAlly(a.id), after: dialogText() };
+    for (let i = 0; i < 12; i++) click('Sell:'); const cycled = state.deals[a.id].sell, expected = [null, ...TRADE_GOODS][13 % (TRADE_GOODS.length + 1)];
+    click('End the deal'); return { text, sell1, buy1, gear, cycled, expected, ally: isAlly(a.id), after: dialogText() };
   });
   assert.ok(r.text.includes('Caravan post') && r.text.includes('Sell: nothing') && r.text.includes('Equipment: no'), r.text);
-  assert.equal(r.sell1, 'berries'); assert.equal(r.buy1, 'berries'); assert.equal(r.gear, true); assert.equal(r.cycled, 'stone');   // 13 clicks round nothing + 9 goods: the fourth entry
+  assert.equal(r.sell1, 'berries'); assert.equal(r.buy1, 'berries'); assert.equal(r.gear, true); assert.equal(r.cycled, r.expected); assert.equal(r.cycled, 'wood');   // 13 clicks round nothing + 10 goods: the third entry
   assert.equal(r.ally, false); assert.ok(r.after.includes('No deals yet'), r.after);
 }));
 

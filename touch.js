@@ -1,4 +1,4 @@
-// Touch / phone support: on-screen controls, a slide-out menu for the side panels, and message snacks.
+// Touch / phone support: on-screen controls, the menu button, and message snacks.
 // Active when the device has a coarse pointer (a phone or tablet) or the page is opened with ?touch=1.
 (function () {
   const touch = matchMedia('(pointer:coarse)').matches || /[?&]touch=1/.test(location.search);
@@ -7,15 +7,10 @@
   document.body.classList.add('touch');
   requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.add('touch-ready')));   // no slide-in animation on first paint
 
-  // The save / graphics buttons live in the slide-out menu instead of the cramped header.
-  const tools = $('drawer-tools');
-  for (const b of [...document.querySelectorAll('.stats .save-btn')]) tools.appendChild(b);
-
+  // The save / graphics buttons live in the menu's settings tab instead of the cramped header (the stylesheet hides them).
   const blocked = () => $('start-screen').style.display !== 'none' || $('overlay').style.display === 'grid' || manualPause;
-  const closeDrawer = () => document.body.classList.remove('drawer-open');
-  const toggleDrawer = () => { document.body.classList.toggle('drawer-open'); lastTick = performance.now(); };
+  const toggleMenu = () => { if ($('start-screen').style.display !== 'none') return; if (menuTab) closeDialog(); else if (!blocked()) openMenu(); };
   window.mobileBack = () => {                       // used by the Android Back button
-    if (document.body.classList.contains('drawer-open')) { closeDrawer(); return true; }
     if ($('overlay').style.display === 'grid' && !state.combat) { closeDialog(); return true; }
     return false;
   };
@@ -34,9 +29,7 @@
   press('t-eat', () => { if (!blocked()) eat(); });
   press('t-torch', () => { if (!blocked()) lightTorch(); });
   press('t-pause', () => togglePause());
-  press('t-menu', toggleDrawer);
-  $('drawer-close').addEventListener('click', closeDrawer);
-  $('drawer-backdrop').addEventListener('click', closeDrawer);
+  press('t-menu', toggleMenu);
 
   // The log is off-screen on a phone, so show the newest message briefly over the map.
   let snackTimer;

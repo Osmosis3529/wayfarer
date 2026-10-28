@@ -102,16 +102,17 @@ test('marching soldiers fight beside you in battle, and the foe may turn on them
       try {
         startCombat(ex, ey, state.x, state.y);
         const hp0 = state.combat.hp, mine = state.hp, soldiers = state.soldiers.map(g => g.hp);
+        const def = mobStats(state.combat.enemy, state.combat.level).defense, mineHit = playerStrike(false, def), theirs = enemyDamage(state.combat.level, state.combat.enemy), guardHit = soldierDamage(def);
         battleAction('attack');
-        const out = { dealt: hp0 - state.combat.hp, myLoss: mine - state.hp, soldierHurt: state.soldiers.some((g, i) => g.hp < (soldiers[i] ?? 99)) };
+        const out = { mineHit, theirs, guardHit, dealt: hp0 - state.combat.hp, myLoss: mine - state.hp, soldierHurt: state.soldiers.some((g, i) => g.hp < (soldiers[i] ?? 99)) };
         state.combat = null; closeDialog();
         return out;
       } finally { Math.random = real; }
     };
     return { alone: run(0), marching: run(3) };
   });
-  assert.equal(r.alone.dealt, 3); assert.equal(r.alone.myLoss, 1); assert.equal(r.alone.soldierHurt, false);
-  assert.equal(r.marching.dealt, 3 + 3 * 2); assert.equal(r.marching.myLoss, 0); assert.equal(r.marching.soldierHurt, true);
+  assert.equal(r.alone.dealt, r.alone.mineHit); assert.equal(r.alone.myLoss, r.alone.theirs); assert.equal(r.alone.soldierHurt, false);
+  assert.equal(r.marching.dealt, r.marching.mineHit + 3 * r.marching.guardHit); assert.equal(r.marching.myLoss, 0); assert.equal(r.marching.soldierHurt, true);
 }));
 
 test('a soldier who falls in battle is replaced for 2 meals, and the marching order stays', () => game(async page => {
@@ -204,7 +205,7 @@ test('a siege: every defender and building must fall, the gates stay shut until 
     const spots = houses.map(h => h.k).sort().join(); state.x = HOME.x + 10; state.y = HOME.y;
     for (let i = 0; i < 8; i++) moveEnemies(); const still = foeBox().filter(f => f.e.building).map(f => f.k).sort().join() === spots;
     // a house is fought by walking into it, in the ordinary battle
-    const taken = new Set(foes.map(f => f.k)); let pick = null;       // an approach tile with no other foe beside it, so only the house is in play
+    const taken = new Set(foeBox().map(f => f.k)); let pick = null;       // an approach tile with no other foe beside it (the guards have moved since they were placed), so only the house is in play
     for (const h of houses) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
       const sx = h.x + dx, sy = h.y + dy;
       if (pick || taken.has(sx + ',' + sy)) continue;
@@ -299,7 +300,7 @@ test('natural enemy spawning does not count war armies and raiders against its c
   const r = await page.evaluate(() => {
     RICH(); const natural = () => foeBox().filter(f => !f.e.faction).length;
     clearRect(5, 5, 60, 40);
-    for (let i = 0; i < OW_CAP + 5; i++) { const x = 6 + (i % 50), y = 6 + Math.floor(i / 50) * 2; overworld[y][x] = 'g'; enemyBucket(overworld).set(x + ',' + y, { ...WAR_FOES.raider, faction: 'raid', raid: true, townId: 'town_0' }); }
+    for (let i = 0; i < owCap() + 5; i++) { const x = 6 + (i % 50), y = 6 + Math.floor(i / 50) * 2; overworld[y][x] = 'g'; enemyBucket(overworld).set(x + ',' + y, { ...WAR_FOES.raider, faction: 'raid', raid: true, townId: 'town_0' }); }
     const before = natural(); spawnEnemy();
     return { before, after: natural() };
   });

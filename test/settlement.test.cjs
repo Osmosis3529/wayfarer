@@ -279,14 +279,14 @@ test('the fishing hut and the lodge sell meals for the pantry, the well heals on
     buyMeals('fishingHut', 5); const pantry = [state.town.food, state.coin];
     openBuilding('huntersLodge'); const lodge = dialogText(); buyMeals('huntersLodge', 1); const lodgeMeals = [state.town.food, state.coin];
     const wellCrew = crew('well'), wellText = (openBuilding('well'), dialogText());
-    state.hp = 1; state.maxHp = 9; drinkWell(); const drank = state.hp; drinkWell(); const again = state.hp;
+    state.hp = 1; state.maxHp = 40; drinkWell(); const drank = state.hp; drinkWell(); const again = state.hp;
     state.day++; state.hp = 1; state.up.well = [true, false, false]; drinkWell(); const upgraded = state.hp;
     hallRest(); return { meals, pantry, lodge, lodgeMeals, wellCrew, wellText, drank, again, upgraded, rested: state.hp, max: state.maxHp };
   });
   assert.ok(r.meals.includes('Fisher') && r.meals.includes('meal'), r.meals);
   assert.deepEqual(r.pantry, [9, 41]); assert.ok(r.lodge.includes('Furs') && r.lodge.includes('Buy 1 meal'), r.lodge); assert.deepEqual(r.lodgeMeals, [10, 39]);
   assert.equal(r.wellCrew, 0); assert.ok(r.wellText.includes('needing no keeper'), r.wellText);
-  assert.equal(r.drank, 3); assert.equal(r.again, 3); assert.equal(r.upgraded, 4); assert.equal(r.rested, r.max);
+  assert.equal(r.drank, 9); assert.equal(r.again, 9); assert.equal(r.upgraded, 13);   // 8 HP, plus 4 per upgrade assert.equal(r.rested, r.max);
 }));
 
 test('the smithy and the mine shaft open from their buildings once someone works there', () => game(async page => {
@@ -445,28 +445,29 @@ test('the hunting camp is gone, the gem hall is the jeweler, and the warehouse i
   assert.deepEqual(r.titles, ['Jeweler', 'Warehouse keeper']); assert.deepEqual(r.names, ['Jeweler', 'Warehouse']);
 }));
 
-test('the mine brings copper, iron and stone; the jeweler brings silver, gold and gems; the lodge brings meals and furs', () => game(async page => {
+test('the mine brings coal, copper, iron and stone; the jeweler brings silver, gold and gems; the lodge brings meals and furs', () => game(async page => {
   const r = await page.evaluate(() => {
     RICH(); build('mine'); build('jeweler'); build('huntersLodge'); state.town.people = 40; state.town.food = 40;
     const seen = { mine: new Set(), jeweler: new Set() }, before = () => ({ ...state.inv });
     state.assign.mine = 2; state.assign.jeweler = 2; state.assign.huntersLodge = 2;
     for (let i = 0; i < 40; i++) {
       for (const k of Object.keys(state.inv)) state.inv[k] = 0;
+      state.inv.coal = 3;                                      // one for each furnace, so nothing runs cold
       state.town.food = 40; const food = state.town.food;
       advanceDay();
-      for (const k of ['copper', 'iron', 'stone']) if (state.inv[k]) seen.mine.add(k);
+      for (const k of ['coal', 'copper', 'iron', 'stone']) if (state.inv[k]) seen.mine.add(k);
       for (const k of ['silver', 'gold', 'gems']) if (state.inv[k]) seen.jeweler.add(k);
       var other = state.inv.wood + state.inv.berries; var lodge = [state.inv.furs, state.town.food - food + state.town.people];
     }
     return { mine: [...seen.mine].sort(), jeweler: [...seen.jeweler].sort(), other, lodge };
   });
-  assert.deepEqual(r.mine, ['copper', 'iron', 'stone']); assert.deepEqual(r.jeweler, ['gems', 'gold', 'silver']); assert.equal(r.other, 0);
+  assert.deepEqual(r.mine, ['coal', 'copper', 'iron', 'stone']); assert.deepEqual(r.jeweler, ['gems', 'gold', 'silver']); assert.equal(r.other, 0);
   assert.equal(r.lodge[0], 2);                                   // two hunters, one fur each
 }));
 
 test('the lodge pays 2 meals and a fur per hunter, starving cuts it, and nobody means nothing', () => game(async page => {
   const r = await page.evaluate(() => {
-    RICH(); build('huntersLodge'); state.town.people = 20; for (const k of Object.keys(state.inv)) state.inv[k] = 0;
+    RICH(); build('huntersLodge'); state.town.people = 20; for (const k of Object.keys(state.inv)) state.inv[k] = 0; state.inv.coal = 50;
     const day = () => { state.town.food = 20; state.inv.furs = 0; advanceDay(); return [state.town.food - 20 + state.town.people, state.inv.furs]; };
     state.assign.huntersLodge = 3; const plain = day();
     state.up.huntersLodge = [true, false, false]; const up = day();
@@ -565,7 +566,7 @@ test('the market, longhouse and caravan post are on the settlement map, with cos
   assert.ok(r.text.includes('longhouse'), r.text);
 }));
 
-test('the hunters’ lodge adds its extra heart once, however often it is rebuilt', () => game(async page => {
+test('the hunters’ lodge adds its extra Health once, however often it is rebuilt', () => game(async page => {
   const r = await page.evaluate(() => {
     RICH(); state.town.people = 40; const hp0 = state.maxHp;
     build('huntersLodge'); const first = state.maxHp - hp0;
@@ -573,5 +574,5 @@ test('the hunters’ lodge adds its extra heart once, however often it is rebuil
     const old = JSON.parse(JSON.stringify(buildSaveData())); delete old.state.lodgeBonus; state.lodgeBonus = false; hydrateWorld(old);
     return { first, second, migrated: state.lodgeBonus };
   });
-  assert.equal(r.first, 1); assert.equal(r.second, 1); assert.equal(r.migrated, true);
+  assert.equal(r.first, 4); assert.equal(r.second, 4); assert.equal(r.migrated, true);   // one Health is 4 HP
 }));
